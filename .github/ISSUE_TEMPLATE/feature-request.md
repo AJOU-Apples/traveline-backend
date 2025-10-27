@@ -28,7 +28,7 @@ assignees: ''
 > Jira 이슈가 존재한다면 아래에 링크를 추가해주세요.  
 > 없다면 이 섹션은 생략 가능합니다.
 
-- Jira Issue: [TRAV-###](https://ajou-apples.atlassian.net/browse/TRAV-3)
+- Jira Issue: [TRAV-###](https://ajou-apples.atlassian.net/browse/TRAV-###)
 
 ---
 
