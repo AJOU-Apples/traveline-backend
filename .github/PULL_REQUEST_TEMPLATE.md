@@ -19,7 +19,7 @@
 > 해당 작업이 Jira에 등록되어 있다면 아래에 링크를 추가해주세요.  
 > 없다면 이 섹션은 삭제하거나 비워두셔도 됩니다.
 
-- Jira Issue: [TRAV-###](https://branchandbound.atlassian.net/browse/TRAV-###)
+- Jira Issue: [TRAV-###](https://ajou-apples.atlassian.net/browse/TRAV-###)
 
 ---
 
