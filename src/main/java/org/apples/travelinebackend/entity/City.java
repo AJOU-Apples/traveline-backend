@@ -27,5 +27,9 @@ public class City {
     private Double latitude;
 
     private Double longitude;
+
+    @Column(length = 10)
+    @Builder.Default
+    private String currency = "KRW";  // 기본 통화 (KRW, JPY, USD, EUR, THB, VND 등)
 }
 

@@ -59,6 +59,7 @@ public class TravelPlanMapper {
                 .isInternational(entity.getIsInternational())
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())
+                .currency(entity.getCurrency())
                 .build();
     }
 }

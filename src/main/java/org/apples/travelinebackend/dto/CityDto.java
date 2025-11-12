@@ -22,5 +22,6 @@ public class CityDto {
     
     private Double latitude;
     private Double longitude;
+    private String currency;  // 통화 코드 (KRW, JPY, USD, EUR, THB, VND 등)
 }
 
