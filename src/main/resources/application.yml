@@ -37,6 +37,12 @@ google:
   maps:
     api-key: ${GOOGLE_MAPS_API_KEY:your-api-key-here}
 
+# Amadeus API
+amadeus:
+  api-key: ${AMADEUS_API_KEY:KwkCHgyWy7j4WTtMOyxiQI0NAjRqOevk}
+  api-secret: ${AMADEUS_API_SECRET:At87UUr179noUfTy}
+  api-url: ${AMADEUS_API_URL:https://test.api.amadeus.com}
+
 # File Storage
 file:
   upload:
