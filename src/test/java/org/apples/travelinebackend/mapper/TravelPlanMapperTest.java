@@ -1,9 +1,9 @@
 package org.apples.travelinebackend.mapper;
 
-import org.apples.travelinebackend.dto.PlaceDto;
+import org.apples.travelinebackend.dto.CityDto;
 import org.apples.travelinebackend.dto.TravelDayDto;
 import org.apples.travelinebackend.dto.TravelPlanDto;
-import org.apples.travelinebackend.entity.Place;
+import org.apples.travelinebackend.entity.City;
 import org.apples.travelinebackend.entity.TravelDay;
 import org.apples.travelinebackend.entity.TravelPlan;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,10 +29,18 @@ class TravelPlanMapperTest {
         @DisplayName("TravelPlan Entity를 DTO로 변환")
         void toDto_TravelPlan() {
                 // given
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .isInternational(true)
+                                .latitude(35.6762)
+                                .longitude(139.6503)
+                                .build();
+                
                 TravelPlan entity = TravelPlan.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destination)
                                 .startDate(LocalDate.of(2024, 11, 20))
                                 .endDate(LocalDate.of(2024, 11, 23))
                                 .participants(2)
@@ -46,7 +54,8 @@ class TravelPlanMapperTest {
                 assertThat(dto).isNotNull();
                 assertThat(dto.getId()).isEqualTo(1L);
                 assertThat(dto.getTitle()).isEqualTo("도쿄 여행");
-                assertThat(dto.getDestination()).isEqualTo("도쿄");
+                assertThat(dto.getDestination()).isNotNull();
+                assertThat(dto.getDestination().getName()).isEqualTo("도쿄");
                 assertThat(dto.getStartDate()).isEqualTo("2024.11.20");
                 assertThat(dto.getEndDate()).isEqualTo("2024.11.23");
                 assertThat(dto.getParticipants()).isEqualTo(2);
@@ -61,7 +70,6 @@ class TravelPlanMapperTest {
                                 .dayNumber(1)
                                 .date(LocalDate.of(2024, 11, 20))
                                 .displayDate("11월 20일(수)")
-                                .places(new ArrayList<>())
                                 .build();
 
                 // when
@@ -76,41 +84,43 @@ class TravelPlanMapperTest {
         }
 
         @Test
-        @DisplayName("Place Entity를 DTO로 변환")
-        void toDto_Place() {
+        @DisplayName("City Entity를 DTO로 변환")
+        void toDto_City() {
                 // given
-                Place entity = Place.builder()
+                City entity = City.builder()
                                 .id(1L)
-                                .name("도쿄 타워")
-                                .address("4 Chome-2-8 Shibakoen, Minato City, Tokyo")
-                                .time("14:00")
-                                .memo("입장료 1,200엔")
-                                .latitude(35.6585805)
-                                .longitude(139.7454329)
+                                .name("도쿄")
+                                .isInternational(true)
+                                .latitude(35.6762)
+                                .longitude(139.6503)
                                 .build();
 
                 // when
-                PlaceDto dto = mapper.toPlaceDto(entity);
+                CityDto dto = mapper.toCityDto(entity);
 
                 // then
                 assertThat(dto).isNotNull();
                 assertThat(dto.getId()).isEqualTo(1L);
-                assertThat(dto.getName()).isEqualTo("도쿄 타워");
-                assertThat(dto.getAddress()).isEqualTo("4 Chome-2-8 Shibakoen, Minato City, Tokyo");
-                assertThat(dto.getTime()).isEqualTo("14:00");
-                assertThat(dto.getMemo()).isEqualTo("입장료 1,200엔");
-                assertThat(dto.getLatitude()).isEqualTo(35.6585805);
-                assertThat(dto.getLongitude()).isEqualTo(139.7454329);
+                assertThat(dto.getName()).isEqualTo("도쿄");
+                assertThat(dto.getIsInternational()).isTrue();
+                assertThat(dto.getLatitude()).isEqualTo(35.6762);
+                assertThat(dto.getLongitude()).isEqualTo(139.6503);
         }
 
         @Test
         @DisplayName("TravelPlan with Days를 DTO로 변환")
         void toDto_TravelPlanWithDays() {
                 // given
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .isInternational(true)
+                                .build();
+                
                 TravelPlan travelPlan = TravelPlan.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destination)
                                 .startDate(LocalDate.of(2024, 11, 20))
                                 .endDate(LocalDate.of(2024, 11, 23))
                                 .participants(2)
@@ -135,50 +145,30 @@ class TravelPlanMapperTest {
         }
 
         @Test
-        @DisplayName("TravelDay with Places를 DTO로 변환")
-        void toDto_TravelDayWithPlaces() {
-                // given
-                TravelDay day = TravelDay.builder()
-                                .id(1L)
-                                .dayNumber(1)
-                                .date(LocalDate.of(2024, 11, 20))
-                                .displayDate("11월 20일(수)")
-                                .build();
-
-                Place place1 = Place.builder()
-                                .id(1L)
-                                .name("도쿄 타워")
-                                .address("4 Chome-2-8 Shibakoen, Minato City, Tokyo")
-                                .build();
-
-                day.addPlace(place1);
-
-                // when
-                TravelDayDto dto = mapper.toDayDto(day);
-
-                // then
-                assertThat(dto).isNotNull();
-                assertThat(dto.getPlaces()).hasSize(1);
-                assertThat(dto.getPlaces().get(0).getName()).isEqualTo("도쿄 타워");
-        }
-
-        @Test
         @DisplayName("null Entity는 null DTO 반환")
         void toDto_NullEntity() {
                 // when & then
                 assertThat(mapper.toDto(null)).isNull();
                 assertThat(mapper.toDayDto(null)).isNull();
-                assertThat(mapper.toPlaceDto(null)).isNull();
+                assertThat(mapper.toCityDto(null)).isNull();
         }
 
         @Test
         @DisplayName("전체 계층 구조 변환")
         void toDto_FullHierarchy() {
                 // given
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .isInternational(true)
+                                .latitude(35.6762)
+                                .longitude(139.6503)
+                                .build();
+                
                 TravelPlan travelPlan = TravelPlan.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destination)
                                 .startDate(LocalDate.of(2024, 11, 20))
                                 .endDate(LocalDate.of(2024, 11, 23))
                                 .participants(2)
@@ -191,27 +181,15 @@ class TravelPlanMapperTest {
                                 .displayDate("11월 20일(수)")
                                 .build();
 
-                Place place1 = Place.builder()
-                                .id(1L)
-                                .name("도쿄 타워")
-                                .address("4 Chome-2-8 Shibakoen, Minato City, Tokyo")
-                                .time("14:00")
-                                .latitude(35.6585805)
-                                .longitude(139.7454329)
-                                .build();
-
-                Place place2 = Place.builder()
+                TravelDay day2 = TravelDay.builder()
                                 .id(2L)
-                                .name("아사쿠사")
-                                .address("Asakusa, Taito City, Tokyo")
-                                .time("17:00")
-                                .latitude(35.7148)
-                                .longitude(139.7967)
+                                .dayNumber(2)
+                                .date(LocalDate.of(2024, 11, 21))
+                                .displayDate("11월 21일(목)")
                                 .build();
 
-                day1.addPlace(place1);
-                day1.addPlace(place2);
                 travelPlan.addDay(day1);
+                travelPlan.addDay(day2);
 
                 // when
                 TravelPlanDto dto = mapper.toDto(travelPlan);
@@ -219,9 +197,9 @@ class TravelPlanMapperTest {
                 // then
                 assertThat(dto).isNotNull();
                 assertThat(dto.getId()).isEqualTo(1L);
-                assertThat(dto.getDays()).hasSize(1);
-                assertThat(dto.getDays().get(0).getPlaces()).hasSize(2);
-                assertThat(dto.getDays().get(0).getPlaces().get(0).getName()).isEqualTo("도쿄 타워");
-                assertThat(dto.getDays().get(0).getPlaces().get(1).getName()).isEqualTo("아사쿠사");
+                assertThat(dto.getDestination().getName()).isEqualTo("도쿄");
+                assertThat(dto.getDays()).hasSize(2);
+                assertThat(dto.getDays().get(0).getDayNumber()).isEqualTo(1);
+                assertThat(dto.getDays().get(1).getDayNumber()).isEqualTo(2);
         }
 }

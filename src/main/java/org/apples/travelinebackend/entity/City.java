@@ -7,36 +7,25 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "places")
+@Table(name = "cities")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Place {
-    
+public class City {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(nullable = false)
     private String name;
-    
-    private String address;
-    
-    private String time;
-    
-    @Column(length = 1000)
-    private String memo;
-    
+
+    @Column(nullable = false)
+    private Boolean isInternational;
+
     private Double latitude;
-    
+
     private Double longitude;
-    
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "travel_day_id", nullable = false)
-    private TravelDay travelDay;
-    
-    @Column(name = "display_order")
-    private Integer displayOrder;
 }
 

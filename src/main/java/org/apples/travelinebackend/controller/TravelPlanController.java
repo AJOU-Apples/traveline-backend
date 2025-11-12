@@ -30,17 +30,15 @@ public class TravelPlanController {
     }
     
     /**
-     * 여행 계획 목록 조회 (필터링 및 페이징 지원)
-     * @param status 여행 상태 필터 (upcoming/ongoing/past, optional)
+     * 여행 계획 목록 조회 (페이징 지원)
      * @param page 페이지 번호 (기본값: 0)
      * @param limit 페이지 당 개수 (기본값: 10)
      */
     @GetMapping
     public ResponseEntity<Page<TravelPlanDto>> getTravelPlans(
-            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int limit) {
-        Page<TravelPlanDto> plans = travelPlanService.getTravelPlans(status, page, limit);
+        Page<TravelPlanDto> plans = travelPlanService.getTravelPlans(page, limit);
         return ResponseEntity.ok(plans);
     }
     

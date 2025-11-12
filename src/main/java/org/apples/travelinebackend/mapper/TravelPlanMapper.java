@@ -1,9 +1,9 @@
 package org.apples.travelinebackend.mapper;
 
-import org.apples.travelinebackend.dto.PlaceDto;
+import org.apples.travelinebackend.dto.CityDto;
 import org.apples.travelinebackend.dto.TravelDayDto;
 import org.apples.travelinebackend.dto.TravelPlanDto;
-import org.apples.travelinebackend.entity.Place;
+import org.apples.travelinebackend.entity.City;
 import org.apples.travelinebackend.entity.TravelDay;
 import org.apples.travelinebackend.entity.TravelPlan;
 import org.springframework.stereotype.Component;
@@ -25,11 +25,10 @@ public class TravelPlanMapper {
         return TravelPlanDto.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
-                .destination(entity.getDestination())
+                .destination(toCityDto(entity.getDestination()))
                 .startDate(entity.getStartDate().format(DATE_FORMATTER))
                 .endDate(entity.getEndDate().format(DATE_FORMATTER))
                 .participants(entity.getParticipants())
-                .status(entity.getStatus().name())
                 .isArchived(entity.getIsArchived())
                 .days(entity.getDays().stream()
                         .map(this::toDayDto)
@@ -47,23 +46,18 @@ public class TravelPlanMapper {
                 .dayNumber(entity.getDayNumber())
                 .date(entity.getDate().format(ISO_DATE_FORMATTER))
                 .displayDate(entity.getDisplayDate())
-                .places(entity.getPlaces().stream()
-                        .map(this::toPlaceDto)
-                        .collect(Collectors.toList()))
                 .build();
     }
     
-    public PlaceDto toPlaceDto(Place entity) {
+    public CityDto toCityDto(City entity) {
         if (entity == null) {
             return null;
         }
         
-        return PlaceDto.builder()
+        return CityDto.builder()
                 .id(entity.getId())
                 .name(entity.getName())
-                .address(entity.getAddress())
-                .time(entity.getTime())
-                .memo(entity.getMemo())
+                .isInternational(entity.getIsInternational())
                 .latitude(entity.getLatitude())
                 .longitude(entity.getLongitude())
                 .build();

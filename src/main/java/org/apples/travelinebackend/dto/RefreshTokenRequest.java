@@ -1,5 +1,6 @@
 package org.apples.travelinebackend.dto;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,13 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class PlaceDto {
-    private Long id;
-    private String name;
-    private String address;
-    private String time;
-    private String memo;
-    private Double latitude;
-    private Double longitude;
+public class RefreshTokenRequest {
+
+    @NotBlank(message = "Refresh token은 필수입니다")
+    private String refreshToken;
 }
 

@@ -9,8 +9,6 @@ import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "travel_days")
@@ -40,20 +38,5 @@ public class TravelDay {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_plan_id", nullable = false)
     private TravelPlan travelPlan;
-    
-    @OneToMany(mappedBy = "travelDay", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
-    @Builder.Default
-    private List<Place> places = new ArrayList<>();
-    
-    public void addPlace(Place place) {
-        places.add(place);
-        place.setTravelDay(this);
-    }
-    
-    public void removePlace(Place place) {
-        places.remove(place);
-        place.setTravelDay(null);
-    }
 }
 

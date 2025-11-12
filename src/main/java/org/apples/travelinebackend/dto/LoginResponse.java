@@ -9,10 +9,13 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TravelDayDto {
-    private Long id;
-    private Integer dayNumber;
-    private String date;
-    private String displayDate;
+public class LoginResponse {
+
+    private Long userId;
+    private String accessToken;
+    private String refreshToken;
+    private String username;
+    private String email;
+    private String profileImage;
 }
 
