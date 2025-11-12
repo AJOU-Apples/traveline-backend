@@ -28,10 +28,10 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
 
     /**
-     * 회원가입
+     * 회원가입 (자동 로그인)
      */
     @Transactional
-    public UserDto register(RegisterRequest request) {
+    public LoginResponse register(RegisterRequest request) {
         log.info("회원가입 시도: email={}", request.getEmail());
 
         // 이메일 중복 체크
@@ -42,6 +42,7 @@ public class AuthService {
         // User 생성
         User user = User.builder()
                 .email(request.getEmail())
+                .name(request.getName())
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .isActive(true)
@@ -51,7 +52,24 @@ public class AuthService {
         User savedUser = userRepository.save(user);
         log.info("회원가입 완료: userId={}", savedUser.getId());
 
-        return mapToUserDto(savedUser);
+        // 자동 로그인 - JWT 토큰 생성
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                savedUser, null, savedUser.getAuthorities()
+        );
+        String accessToken = tokenProvider.generateAccessToken(authentication);
+        String refreshToken = tokenProvider.generateRefreshToken(savedUser.getEmail());
+
+        // lastLoginAt 업데이트
+        savedUser.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(savedUser);
+
+        log.info("회원가입 후 자동 로그인 완료: userId={}", savedUser.getId());
+
+        return LoginResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .user(mapToAuthUserDto(savedUser))
+                .build();
     }
 
     /**
@@ -59,12 +77,13 @@ public class AuthService {
      */
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        log.info("로그인 시도: email={}", request.getEmail());
+        String email = request.getUsername();  // Frontend는 email을 username 필드로 전송
+        log.info("로그인 시도: email={}", email);
 
         // 인증
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
+                        email,
                         request.getPassword()
                 )
         );
@@ -73,10 +92,10 @@ public class AuthService {
 
         // JWT 토큰 생성
         String accessToken = tokenProvider.generateAccessToken(authentication);
-        String refreshToken = tokenProvider.generateRefreshToken(request.getEmail());
+        String refreshToken = tokenProvider.generateRefreshToken(email);
 
         // lastLoginAt 업데이트
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("사용자를 찾을 수 없습니다."));
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
@@ -84,12 +103,9 @@ public class AuthService {
         log.info("로그인 완료: userId={}", user.getId());
 
         return LoginResponse.builder()
-                .userId(user.getId())
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .profileImage(user.getProfileImage())
+                .user(mapToAuthUserDto(user))
                 .build();
     }
 
@@ -120,12 +136,22 @@ public class AuthService {
         log.info("토큰 갱신 완료: userId={}", user.getId());
 
         return LoginResponse.builder()
-                .userId(user.getId())
                 .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
-                .username(user.getUsername())
+                .user(mapToAuthUserDto(user))
+                .build();
+    }
+
+    /**
+     * User -> AuthUserDto 변환 (인증 응답용)
+     */
+    private AuthUserDto mapToAuthUserDto(User user) {
+        return AuthUserDto.builder()
+                .id(user.getId())
                 .email(user.getEmail())
-                .profileImage(user.getProfileImage())
+                .name(user.getName())
+                .username(user.getUsername())
+                .profileImageUrl(user.getProfileImage())
                 .build();
     }
 
@@ -136,6 +162,7 @@ public class AuthService {
         return UserDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .name(user.getName())
                 .username(user.getUsername())
                 .profileImage(user.getProfileImage())
                 .bio(user.getBio())

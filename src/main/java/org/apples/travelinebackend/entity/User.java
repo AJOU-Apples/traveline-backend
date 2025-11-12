@@ -35,7 +35,10 @@ public class User implements UserDetails {
     private String email;
 
     @Column(nullable = false, length = 50)
-    private String username;
+    private String name;  // 실제 이름
+
+    @Column(nullable = false, length = 50)
+    private String username;  // 닉네임
 
     @Column(nullable = false)
     private String password;  // BCrypt 암호화
@@ -86,7 +89,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;  // Spring Security는 email을 username으로 사용
+        return username;
     }
 
     @Override

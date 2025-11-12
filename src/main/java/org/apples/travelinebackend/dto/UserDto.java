@@ -15,7 +15,8 @@ public class UserDto {
 
     private Long id;
     private String email;
-    private String username;
+    private String name;  // 실제 이름
+    private String username;  // 닉네임
     private String profileImage;
     private String bio;
     private Boolean isActive;

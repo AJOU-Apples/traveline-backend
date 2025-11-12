@@ -20,14 +20,14 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * 회원가입
+     * 회원가입 (자동 로그인)
      * POST /api/auth/register
      */
     @PostMapping("/register")
-    public ResponseEntity<UserDto> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
         log.info("POST /api/auth/register - email: {}", request.getEmail());
-        UserDto userDto = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(userDto);
+        LoginResponse response = authService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -36,7 +36,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("POST /api/auth/login - email: {}", request.getEmail());
+        log.info("POST /api/auth/login - email: {}", request.getUsername());
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }

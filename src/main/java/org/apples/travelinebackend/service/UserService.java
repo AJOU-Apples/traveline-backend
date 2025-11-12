@@ -50,6 +50,9 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
 
         // 수정 가능한 필드만 업데이트
+        if (request.getName() != null) {
+            user.setName(request.getName());
+        }
         if (request.getUsername() != null) {
             user.setUsername(request.getUsername());
         }
@@ -73,6 +76,7 @@ public class UserService {
         return UserDto.builder()
                 .id(user.getId())
                 .email(user.getEmail())
+                .name(user.getName())
                 .username(user.getUsername())
                 .profileImage(user.getProfileImage())
                 .bio(user.getBio())
