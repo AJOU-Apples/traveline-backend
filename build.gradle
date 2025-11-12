@@ -36,6 +36,13 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
     
+    // 🌐 외부 API 호출 (WebClient)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    
+    // 📸 이미지 처리
+    implementation 'net.coobird:thumbnailator:0.4.19'
+    implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+    
     // 🛠️ 개발 도구
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

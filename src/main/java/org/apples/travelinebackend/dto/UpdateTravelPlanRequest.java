@@ -1,6 +1,5 @@
 package org.apples.travelinebackend.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,8 +16,7 @@ public class UpdateTravelPlanRequest {
 
     private String title;
 
-    @Valid
-    private CityDto destination;
+    private Long destinationId;
 
     private String startDate;
 

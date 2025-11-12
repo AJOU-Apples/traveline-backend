@@ -39,6 +39,11 @@ public class SecurityConfig {
                                 "/api/cities/**",
                                 "/error"
                         ).permitAll()
+                        // Static resources (photos, thumbnails)
+                        .requestMatchers(
+                                "/photos/**",
+                                "/thumbnails/**"
+                        ).permitAll()
                         // All other endpoints require authentication
                         .anyRequest().authenticated()
                 )

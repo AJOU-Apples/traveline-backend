@@ -1,6 +1,5 @@
 package org.apples.travelinebackend.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -22,8 +21,7 @@ public class CreateTravelPlanRequest {
     private String title;
 
     @NotNull(message = "목적지는 필수입니다")
-    @Valid
-    private CityDto destination;
+    private Long destinationId;
 
     @NotBlank(message = "시작일은 필수입니다")
     private String startDate;

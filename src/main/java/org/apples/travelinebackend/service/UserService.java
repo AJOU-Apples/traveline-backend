@@ -77,7 +77,7 @@ public class UserService {
                 .id(user.getId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .username(user.getUsername())
+                .username(user.getNickname())  // 닉네임 필드
                 .profileImage(user.getProfileImage())
                 .bio(user.getBio())
                 .isActive(user.getIsActive())

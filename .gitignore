@@ -35,3 +35,15 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Environment Variables ###
+.env
+.env.local
+.env.*.local
+application-local.yml
+application-prod.yml
+application-*.yml
+!application.yml
+
+### File Uploads ###
+uploads/

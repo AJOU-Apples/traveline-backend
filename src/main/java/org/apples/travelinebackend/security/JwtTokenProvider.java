@@ -32,6 +32,7 @@ public class JwtTokenProvider {
 
     /**
      * Access Token 생성
+     * subject에 email 저장 (User.getUsername()이 email을 반환)
      */
     public String generateAccessToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
@@ -39,7 +40,7 @@ public class JwtTokenProvider {
         Date expiryDate = new Date(now.getTime() + accessTokenValidity);
 
         return Jwts.builder()
-                .subject(userDetails.getUsername())
+                .subject(userDetails.getUsername())  // User.getUsername()은 email 반환
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -63,6 +64,7 @@ public class JwtTokenProvider {
 
     /**
      * JWT 토큰에서 사용자 이메일 추출
+     * subject에서 email 반환
      */
     public String getEmailFromToken(String token) {
         Claims claims = Jwts.parser()
@@ -71,7 +73,7 @@ public class JwtTokenProvider {
                 .parseSignedClaims(token)
                 .getPayload();
 
-        return claims.getSubject();
+        return claims.getSubject();  // subject는 email
     }
 
     /**

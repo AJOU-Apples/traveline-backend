@@ -14,8 +14,7 @@ import java.util.stream.Collectors;
 @Component
 public class TravelPlanMapper {
     
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-    private static final DateTimeFormatter ISO_DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     
     public TravelPlanDto toDto(TravelPlan entity) {
         if (entity == null) {
@@ -44,7 +43,7 @@ public class TravelPlanMapper {
         return TravelDayDto.builder()
                 .id(entity.getId())
                 .dayNumber(entity.getDayNumber())
-                .date(entity.getDate().format(ISO_DATE_FORMATTER))
+                .date(entity.getDate().format(DATE_FORMATTER))
                 .displayDate(entity.getDisplayDate())
                 .build();
     }

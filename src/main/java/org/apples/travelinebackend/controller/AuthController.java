@@ -31,12 +31,12 @@ public class AuthController {
     }
 
     /**
-     * 로그인
+     * 로그인 - 이메일/패스워드로 사용자 검증
      * POST /api/auth/login
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("POST /api/auth/login - email: {}", request.getUsername());
+        log.info("POST /api/auth/login - email: {}", request.getEmail());
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
@@ -64,4 +64,3 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "로그아웃되었습니다."));
     }
 }
-

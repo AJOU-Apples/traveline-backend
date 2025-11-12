@@ -87,8 +87,18 @@ public class User implements UserDetails {
         return password;
     }
 
+    /**
+     * Spring Security에서 사용하는 username (인증에 email 사용)
+     */
     @Override
     public String getUsername() {
+        return email;  // 로그인 시 email을 사용하므로 email 반환
+    }
+    
+    /**
+     * 사용자 닉네임 조회 (username 필드)
+     */
+    public String getNickname() {
         return username;
     }
 
