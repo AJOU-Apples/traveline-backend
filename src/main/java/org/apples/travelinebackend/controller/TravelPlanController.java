@@ -86,13 +86,13 @@ public class TravelPlanController {
     }
     
     /**
-     * 특정 여행 계획 조회 (소유자 검증)
+     * 특정 여행 계획 조회 (멤버 검증 - 소유자 또는 멤버만 조회 가능)
      */
     @GetMapping("/{planId}")
     public ResponseEntity<TravelPlanDto> getTravelPlan(
             @AuthenticationPrincipal User currentUser,
             @PathVariable Long planId) {
-        TravelPlanDto plan = travelPlanService.getTravelPlanByIdWithAuth(planId, currentUser.getId());
+        TravelPlanDto plan = travelPlanService.getTravelPlanByIdSecure(planId, currentUser.getId());
         return ResponseEntity.ok(plan);
     }
     

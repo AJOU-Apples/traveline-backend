@@ -4,20 +4,22 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.apples.travelinebackend.entity.PhotoVisibility;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class MemoDto {
+public class TaskDto {
     private Long id;
-    private Long placeId;
-    private AuthUserDto author;
-    private String content;
-    private PhotoVisibility visibility;
+    private Long travelPlanId;
+    private String text;
+    private LocalDate deadline;
+    private String memo;
+    private Boolean checked;
+    private LocalDateTime checkedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

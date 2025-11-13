@@ -8,36 +8,42 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "memos")
+@Table(name = "travel_plan_tasks", indexes = {
+        @Index(name = "idx_task_travelplan", columnList = "travel_plan_id")
+})
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class Memo {
+public class Task {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "place_id", nullable = false)
-    private Place place;
+    @JoinColumn(name = "travel_plan_id", nullable = false)
+    private TravelPlan travelPlan;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", nullable = false)
-    private User author;
+    @Column(nullable = false, length = 200)
+    private String text;  // 해야 할 일
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String content;
+    @Column
+    private LocalDate deadline;  // 기한 (선택)
 
-    // 공개 설정
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(columnDefinition = "TEXT")
+    private String memo;  // 비고
+
+    @Column(nullable = false)
     @Builder.Default
-    private PhotoVisibility visibility = PhotoVisibility.SHARED;
+    private Boolean checked = false;  // 체크 여부
+
+    @Column
+    private LocalDateTime checkedAt;  // 체크 시간
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

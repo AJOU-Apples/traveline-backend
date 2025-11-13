@@ -33,15 +33,21 @@ public class MemoService {
     public MemoDto createMemo(CreateMemoRequest request, User user) {
         log.info("메모 생성 요청: placeId={}, userId={}", request.getPlaceId(), user.getId());
 
-        // Place 존재 확인
-        Place place = placeRepository.findById(request.getPlaceId())
+        // Place 존재 및 권한 확인
+        Place place = placeRepository.findByIdWithTravelPlan(request.getPlaceId())
                 .orElseThrow(() -> new ResourceNotFoundException("장소를 찾을 수 없습니다: " + request.getPlaceId()));
+
+        // 여행 계획 멤버 확인 (EDITOR 이상 필요)
+        if (!place.getTravelDay().getTravelPlan().hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("메모를 작성할 권한이 없습니다");
+        }
 
         // Memo 생성
         Memo memo = Memo.builder()
                 .place(place)
                 .author(user)
                 .content(request.getContent())
+                .visibility(request.getVisibility() != null ? request.getVisibility() : org.apples.travelinebackend.entity.PhotoVisibility.SHARED)
                 .build();
 
         Memo savedMemo = memoRepository.save(memo);
@@ -52,15 +58,20 @@ public class MemoService {
     }
 
     @Transactional(readOnly = true)
-    public List<MemoDto> getMemosByPlace(Long placeId) {
-        log.info("장소별 메모 목록 조회: placeId={}", placeId);
+    public List<MemoDto> getMemosByPlace(Long placeId, User user) {
+        log.info("장소별 메모 목록 조회: placeId={}, userId={}", placeId, user.getId());
 
-        // Place 존재 확인
-        if (!placeRepository.existsById(placeId)) {
-            throw new ResourceNotFoundException("장소를 찾을 수 없습니다: " + placeId);
+        // Place 존재 및 권한 확인
+        Place place = placeRepository.findByIdWithTravelPlan(placeId)
+                .orElseThrow(() -> new ResourceNotFoundException("장소를 찾을 수 없습니다: " + placeId));
+
+        // 여행 계획 멤버 확인
+        if (!place.getTravelDay().getTravelPlan().hasAccess(user.getId())) {
+            throw new ForbiddenException("해당 장소에 대한 권한이 없습니다");
         }
 
-        List<Memo> memos = memoRepository.findByPlaceIdAndDeletedAtIsNull(placeId);
+        // SHARED 또는 본인 메모만 조회
+        List<Memo> memos = memoRepository.findByPlaceIdWithVisibility(placeId, user.getId());
         return memos.stream()
                 .map(memoMapper::toDto)
                 .collect(Collectors.toList());
@@ -89,6 +100,9 @@ public class MemoService {
         }
 
         memo.setContent(request.getContent());
+        if (request.getVisibility() != null) {
+            memo.setVisibility(request.getVisibility());
+        }
         Memo updatedMemo = memoRepository.save(memo);
 
         log.info("메모 수정 완료: memoId={}", memoId);

@@ -3,6 +3,7 @@ package org.apples.travelinebackend.repository;
 import org.apples.travelinebackend.entity.Photo;
 import org.apples.travelinebackend.entity.PhotoVisibility;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -12,6 +13,13 @@ import java.util.Optional;
 
 @Repository
 public interface PhotoRepository extends JpaRepository<Photo, Long> {
+    
+    /**
+     * 특정 장소의 모든 사진의 place 참조 해제
+     */
+    @Modifying
+    @Query("UPDATE Photo p SET p.place = NULL WHERE p.place.id = :placeId")
+    int clearPlaceReference(@Param("placeId") Long placeId);
     
     /**
      * 특정 장소의 사진 조회 (권한 필터링, orderIndex 순서대로)

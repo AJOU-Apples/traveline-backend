@@ -26,9 +26,9 @@ public class MemoMapper {
                         .profileImageUrl(memo.getAuthor().getProfileImage())
                         .build())
                 .content(memo.getContent())
+                .visibility(memo.getVisibility())
                 .createdAt(memo.getCreatedAt())
                 .updatedAt(memo.getUpdatedAt())
                 .build();
     }
 }
-

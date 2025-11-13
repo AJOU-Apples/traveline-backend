@@ -37,12 +37,12 @@ public class ExpenseService {
      */
     @Transactional
     public ExpenseDto createExpense(CreateExpenseRequest request, User user) {
-        // TravelPlan 조회 및 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(request.getTravelPlanId())
+        // TravelPlan 조회 및 권한 검증 (members 포함)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(request.getTravelPlanId())
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", request.getTravelPlanId()));
 
-        if (!travelPlan.getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
+        if (!travelPlan.hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("지출을 추가할 권한이 없습니다.");
         }
 
         // TravelDay 조회 (optional)
@@ -109,14 +109,15 @@ public class ExpenseService {
      */
     public List<ExpenseDto> getExpensesByTravelPlan(Long travelPlanId, ExpenseType type, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasAccess(userId)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
 
-        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndType(travelPlanId, type);
+        // SHARED 또는 본인 지출만 조회
+        List<Expense> expenses = expenseRepository.findByTravelPlanIdAndTypeWithVisibility(travelPlanId, type, userId);
         return expenses.stream()
                 .map(expenseMapper::toDto)
                 .collect(Collectors.toList());
@@ -130,11 +131,12 @@ public class ExpenseService {
         Place place = placeRepository.findByIdWithTravelPlan(placeId)
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
 
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasAccess(userId)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
 
-        List<Expense> expenses = expenseRepository.findByPlaceId(placeId);
+        // SHARED 또는 본인 지출만 조회
+        List<Expense> expenses = expenseRepository.findByPlaceIdWithVisibility(placeId, userId);
         return expenses.stream()
                 .map(expenseMapper::toDto)
                 .collect(Collectors.toList());
@@ -145,10 +147,10 @@ public class ExpenseService {
      */
     public List<ExpenseDto> getExpensesByDay(Long travelPlanId, Integer dayNumber, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasAccess(userId)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
 
@@ -156,7 +158,8 @@ public class ExpenseService {
         TravelDay travelDay = travelDayRepository.findByTravelPlanIdAndDayNumber(travelPlanId, dayNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 일차", "dayNumber", dayNumber));
 
-        List<Expense> expenses = expenseRepository.findByTravelDayId(travelDay.getId());
+        // SHARED 또는 본인 지출만 조회
+        List<Expense> expenses = expenseRepository.findByTravelDayIdWithVisibility(travelDay.getId(), userId);
         return expenses.stream()
                 .map(expenseMapper::toDto)
                 .collect(Collectors.toList());
@@ -170,7 +173,7 @@ public class ExpenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("지출", "id", expenseId));
 
         // 권한 검증
-        if (!expense.getTravelPlan().getUser().getId().equals(userId)) {
+        if (!expense.getTravelPlan().hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 지출에 대한 권한이 없습니다.");
         }
 
@@ -245,11 +248,11 @@ public class ExpenseService {
         Expense expense = expenseRepository.findByIdWithTravelPlan(expenseId)
                 .orElseThrow(() -> new ResourceNotFoundException("지출", "id", expenseId));
 
-        // 권한 검증 (결제한 사람 또는 여행 계획 소유자만 삭제 가능)
-        boolean isOwner = expense.getTravelPlan().getUser().getId().equals(userId);
+        // 권한 검증 (결제한 사람 또는 여행 계획 OWNER/EDITOR만 삭제 가능)
+        boolean hasPermission = expense.getTravelPlan().hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR);
         boolean isPayer = expense.getPaidBy().getId().equals(userId);
 
-        if (!isOwner && !isPayer) {
+        if (!hasPermission && !isPayer) {
             throw new ForbiddenException("지출을 삭제할 권한이 없습니다.");
         }
 
@@ -262,10 +265,10 @@ public class ExpenseService {
      */
     public ExpenseSummaryDto getExpenseSummary(Long travelPlanId, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
 

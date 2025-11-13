@@ -56,11 +56,11 @@ public class PhotoService {
         }
 
         // TravelPlan 조회 및 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
+        if (!travelPlan.hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("사진을 업로드할 권한이 없습니다.");
         }
 
         // TravelDay 조회 (optional)
@@ -131,7 +131,7 @@ public class PhotoService {
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
 
         // 권한 검증
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
 
@@ -146,10 +146,10 @@ public class PhotoService {
      */
     public List<PhotoDto> getPhotosByDay(Long travelPlanId, Integer dayNumber, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
 
@@ -168,10 +168,10 @@ public class PhotoService {
      */
     public List<PhotoDto> getPhotosByTravelPlan(Long travelPlanId, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
 
@@ -188,13 +188,13 @@ public class PhotoService {
         Photo photo = photoRepository.findByIdWithTravelPlan(photoId)
                 .orElseThrow(() -> new ResourceNotFoundException("사진", "id", photoId));
 
-        // 권한 검증 (여행 계획 소유자 또는 사진 업로더)
-        boolean isOwner = photo.getTravelPlan().getUser().getId().equals(userId);
+        // 권한 검증 (여행 계획 멤버 또는 사진 업로더)
+        boolean hasPlanAccess = photo.getTravelPlan().hasAccess(userId);
         boolean isUploader = photo.getUser().getId().equals(userId);
         boolean isShared = photo.getVisibility() == PhotoVisibility.SHARED;
 
-        if (!isOwner && !(isUploader || isShared)) {
-            throw new ForbiddenException("해당 사진에 대한 권한이 없습니다.");
+        if (!hasPlanAccess && !isUploader && !isShared) {
+            throw new ForbiddenException("사진을 볼 권한이 없습니다.");
         }
 
         return photoMapper.toDto(photo);
@@ -251,11 +251,11 @@ public class PhotoService {
         Photo photo = photoRepository.findByIdWithTravelPlan(photoId)
                 .orElseThrow(() -> new ResourceNotFoundException("사진", "id", photoId));
 
-        // 권한 검증 (사진 업로더 또는 여행 계획 소유자만 삭제 가능)
-        boolean isOwner = photo.getTravelPlan().getUser().getId().equals(userId);
+        // 권한 검증 (사진 업로더 또는 여행 계획 EDITOR 이상만 삭제 가능)
+        boolean hasPermission = photo.getTravelPlan().hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR);
         boolean isUploader = photo.getUser().getId().equals(userId);
 
-        if (!isOwner && !isUploader) {
+        if (!hasPermission && !isUploader) {
             throw new ForbiddenException("사진을 삭제할 권한이 없습니다.");
         }
 
@@ -289,7 +289,7 @@ public class PhotoService {
         Place place = placeRepository.findByIdWithTravelPlan(placeId)
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
 
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
 

@@ -35,11 +35,11 @@ public class AccommodationService {
         log.info("숙소 정보 생성 요청: travelPlanId={}, userId={}", request.getTravelPlanId(), user.getId());
 
         // TravelPlan 존재 및 권한 확인
-        TravelPlan travelPlan = travelPlanRepository.findById(request.getTravelPlanId())
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(request.getTravelPlanId())
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획을 찾을 수 없습니다: " + request.getTravelPlanId()));
 
-        if (!travelPlan.getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("본인의 여행 계획에만 숙소를 등록할 수 있습니다");
+        if (!travelPlan.hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("숙소를 등록할 권한이 없습니다");
         }
 
         // 체크인/아웃 날짜 검증
@@ -92,11 +92,11 @@ public class AccommodationService {
         log.info("여행 계획별 숙소 목록 조회: travelPlanId={}", travelPlanId);
 
         // TravelPlan 존재 및 권한 확인
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획을 찾을 수 없습니다: " + travelPlanId));
 
-        if (!travelPlan.getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("본인의 여행 계획만 조회할 수 있습니다");
+        if (!travelPlan.hasAccess(user.getId())) {
+            throw new ForbiddenException("여행 계획에 접근할 권한이 없습니다");
         }
 
         List<Accommodation> accommodations = accommodationRepository.findByTravelPlanIdAndDeletedAtIsNull(travelPlanId);
@@ -112,8 +112,8 @@ public class AccommodationService {
         Accommodation accommodation = accommodationRepository.findByIdAndDeletedAtIsNull(accommodationId)
                 .orElseThrow(() -> new ResourceNotFoundException("숙소 정보를 찾을 수 없습니다: " + accommodationId));
 
-        if (!accommodation.getTravelPlan().getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("본인의 숙소 정보만 조회할 수 있습니다");
+        if (!accommodation.getTravelPlan().hasAccess(user.getId())) {
+            throw new ForbiddenException("숙소 정보에 접근할 권한이 없습니다");
         }
 
         return accommodationMapper.toDto(accommodation);
@@ -126,8 +126,8 @@ public class AccommodationService {
         Accommodation accommodation = accommodationRepository.findByIdAndDeletedAtIsNull(accommodationId)
                 .orElseThrow(() -> new ResourceNotFoundException("숙소 정보를 찾을 수 없습니다: " + accommodationId));
 
-        if (!accommodation.getTravelPlan().getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("본인의 숙소 정보만 수정할 수 있습니다");
+        if (!accommodation.getTravelPlan().hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("숙소 정보를 수정할 권한이 없습니다");
         }
 
         // 체크인/아웃 날짜 검증 (둘 다 제공된 경우만)
@@ -170,8 +170,8 @@ public class AccommodationService {
         Accommodation accommodation = accommodationRepository.findByIdAndDeletedAtIsNull(accommodationId)
                 .orElseThrow(() -> new ResourceNotFoundException("숙소 정보를 찾을 수 없습니다: " + accommodationId));
 
-        if (!accommodation.getTravelPlan().getUser().getId().equals(user.getId())) {
-            throw new ForbiddenException("본인의 숙소 정보만 삭제할 수 있습니다");
+        if (!accommodation.getTravelPlan().hasRole(user.getId(), org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
+            throw new ForbiddenException("숙소 정보를 삭제할 권한이 없습니다");
         }
 
         accommodation.setDeletedAt(LocalDateTime.now());

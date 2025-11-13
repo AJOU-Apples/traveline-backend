@@ -33,9 +33,11 @@ public class MemoController {
     }
 
     @GetMapping("/place/{placeId}")
-    public ResponseEntity<List<MemoDto>> getMemosByPlace(@PathVariable Long placeId) {
-        log.info("GET /api/memos/place/{} - 장소별 메모 목록 조회", placeId);
-        List<MemoDto> memos = memoService.getMemosByPlace(placeId);
+    public ResponseEntity<List<MemoDto>> getMemosByPlace(
+            @PathVariable Long placeId,
+            @AuthenticationPrincipal User currentUser) {
+        log.info("GET /api/memos/place/{} - 장소별 메모 목록 조회, userId={}", placeId, currentUser.getId());
+        List<MemoDto> memos = memoService.getMemosByPlace(placeId, currentUser);
         return ResponseEntity.ok(memos);
     }
 

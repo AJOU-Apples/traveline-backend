@@ -16,10 +16,22 @@ import java.util.Optional;
 @Repository
 public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
     
+    /**
+     * ID로 TravelPlan 조회 (members 포함)
+     * 권한 체크를 위해 members를 함께 로드
+     */
+    @Query("SELECT tp FROM TravelPlan tp " +
+           "LEFT JOIN FETCH tp.members " +
+           "WHERE tp.id = :id")
+    Optional<TravelPlan> findByIdWithMembers(@Param("id") Long id);
+    
     @Query("SELECT DISTINCT tp FROM TravelPlan tp LEFT JOIN FETCH tp.days ORDER BY tp.createdAt DESC")
     List<TravelPlan> findAllWithDays();
     
-    @Query("SELECT DISTINCT tp FROM TravelPlan tp LEFT JOIN FETCH tp.days WHERE tp.id = :id")
+    @Query("SELECT DISTINCT tp FROM TravelPlan tp " +
+           "LEFT JOIN FETCH tp.days " +
+           "LEFT JOIN FETCH tp.members " +
+           "WHERE tp.id = :id")
     Optional<TravelPlan> findByIdWithDays(@Param("id") Long id);
     
     // 전체 조회 (페이징 지원)
@@ -34,14 +46,22 @@ public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
     
     /**
      * 특정 유저의 여행 계획 조회 (일차 정보 포함)
+     * 소유자이거나 멤버인 여행 모두 조회
      */
-    @Query("SELECT DISTINCT tp FROM TravelPlan tp LEFT JOIN FETCH tp.days WHERE tp.user.id = :userId ORDER BY tp.startDate DESC")
+    @Query("SELECT DISTINCT tp FROM TravelPlan tp " +
+           "LEFT JOIN FETCH tp.days " +
+           "LEFT JOIN tp.members m " +
+           "WHERE tp.user.id = :userId OR (m.user.id = :userId AND m.status = 'ACCEPTED') " +
+           "ORDER BY tp.startDate DESC")
     List<TravelPlan> findByUserIdWithDays(@Param("userId") Long userId);
     
     /**
      * 특정 유저의 여행 계획 조회 (상태 필터링)
+     * 소유자이거나 멤버인 여행 모두 조회
      */
-    @Query("SELECT tp FROM TravelPlan tp WHERE tp.user.id = :userId " +
+    @Query("SELECT DISTINCT tp FROM TravelPlan tp " +
+           "LEFT JOIN tp.members m " +
+           "WHERE (tp.user.id = :userId OR (m.user.id = :userId AND m.status = 'ACCEPTED')) " +
            "AND (:status IS NULL OR tp.status = :status) " +
            "AND (:isArchived IS NULL OR tp.isArchived = :isArchived) " +
            "ORDER BY tp.startDate DESC")
@@ -51,8 +71,11 @@ public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
     
     /**
      * 특정 유저의 다가오는 여행 조회 (시작일 기준 가장 가까운 여행)
+     * 소유자이거나 멤버인 여행 모두 조회
      */
-    @Query("SELECT tp FROM TravelPlan tp WHERE tp.user.id = :userId " +
+    @Query("SELECT DISTINCT tp FROM TravelPlan tp " +
+           "LEFT JOIN tp.members m " +
+           "WHERE (tp.user.id = :userId OR (m.user.id = :userId AND m.status = 'ACCEPTED')) " +
            "AND tp.startDate >= :today " +
            "AND tp.status IN ('PLANNING', 'ONGOING') " +
            "AND tp.isArchived = false " +
@@ -62,8 +85,13 @@ public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
     
     /**
      * 특정 유저의 여행 계획 조회 (ID와 User로 검증)
+     * 소유자이거나 멤버인 경우 조회 가능
      */
-    @Query("SELECT DISTINCT tp FROM TravelPlan tp LEFT JOIN FETCH tp.days WHERE tp.id = :id AND tp.user.id = :userId")
+    @Query("SELECT DISTINCT tp FROM TravelPlan tp " +
+           "LEFT JOIN FETCH tp.days " +
+           "LEFT JOIN tp.members m " +
+           "WHERE tp.id = :id " +
+           "AND (tp.user.id = :userId OR (m.user.id = :userId AND m.status = 'ACCEPTED'))")
     Optional<TravelPlan> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
 }
 

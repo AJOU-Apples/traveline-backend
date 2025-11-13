@@ -1,8 +1,12 @@
 package org.apples.travelinebackend.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apples.travelinebackend.dto.*;
+import org.apples.travelinebackend.entity.Expense;
+import org.apples.travelinebackend.entity.Memo;
+import org.apples.travelinebackend.entity.Photo;
 import org.apples.travelinebackend.entity.Place;
 import org.apples.travelinebackend.entity.TravelDay;
 import org.apples.travelinebackend.entity.TravelPlan;
@@ -10,6 +14,9 @@ import org.apples.travelinebackend.exception.BadRequestException;
 import org.apples.travelinebackend.exception.ForbiddenException;
 import org.apples.travelinebackend.exception.ResourceNotFoundException;
 import org.apples.travelinebackend.mapper.PlaceMapper;
+import org.apples.travelinebackend.repository.ExpenseRepository;
+import org.apples.travelinebackend.repository.MemoRepository;
+import org.apples.travelinebackend.repository.PhotoRepository;
 import org.apples.travelinebackend.repository.PlaceRepository;
 import org.apples.travelinebackend.repository.TravelDayRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
@@ -31,7 +38,11 @@ public class PlaceService {
     private final PlaceRepository placeRepository;
     private final TravelDayRepository travelDayRepository;
     private final TravelPlanRepository travelPlanRepository;
+    private final PhotoRepository photoRepository;
+    private final MemoRepository memoRepository;
+    private final ExpenseRepository expenseRepository;
     private final PlaceMapper placeMapper;
+    private final EntityManager entityManager;
 
     /**
      * 장소 추가
@@ -39,10 +50,10 @@ public class PlaceService {
     @Transactional
     public PlaceDto createPlace(CreatePlaceRequest request, Long userId) {
         // TravelPlan 조회 및 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(request.getTravelPlanId())
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(request.getTravelPlanId())
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", request.getTravelPlanId()));
         
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
         
@@ -83,10 +94,10 @@ public class PlaceService {
      */
     public List<PlaceDto> getPlacesByDay(Long travelPlanId, Integer dayNumber, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(travelPlanId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(travelPlanId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", travelPlanId));
         
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasAccess(userId)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
         
@@ -105,7 +116,7 @@ public class PlaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
         
         // 권한 검증
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasAccess(userId)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
         
@@ -121,7 +132,7 @@ public class PlaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
         
         // 권한 검증
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasAccess(userId)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
         
@@ -171,17 +182,53 @@ public class PlaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
         
         // 권한 검증
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasAccess(userId)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
         
         Long travelDayId = place.getTravelDay().getId();
         Integer deletedOrderIndex = place.getOrderIndex();
         
-        placeRepository.delete(place);
+        // 1. 연결된 Memo들 강제 삭제 (place_id가 NOT NULL이므로 하드 삭제)
+        int memoCount = memoRepository.hardDeleteByPlaceId(placeId);
+        if (memoCount > 0) {
+            log.info("장소 삭제 전 연결된 메모 {} 개 삭제: placeId={}", memoCount, placeId);
+        }
+        
+        // 2. 연결된 Photo들의 place 참조 해제 (사진은 유지하되 장소 연결만 해제)
+        int photoCount = photoRepository.clearPlaceReference(placeId);
+        if (photoCount > 0) {
+            log.info("장소 삭제 전 연결된 사진 {} 개의 place 참조 해제: placeId={}", photoCount, placeId);
+        }
+        
+        // 3. 연결된 Expense들 완전 삭제 (JPQL DELETE로 하드 삭제)
+        int expenseCount = expenseRepository.hardDeleteByPlaceId(placeId);
+        if (expenseCount > 0) {
+            log.info("장소 삭제 전 연결된 지출 {} 개 삭제: placeId={}", expenseCount, placeId);
+        }
+        
+        // 4. 변경 사항을 DB에 반영하고 영속성 컨텍스트 초기화
+        entityManager.flush();
+        entityManager.clear();
+        
+        // 5. Place를 다시 조회하고 TravelDay와의 관계를 끊은 후 삭제
+        Place placeToDelete = placeRepository.findById(placeId)
+                .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
+        
+        // TravelDay를 다시 조회해서 places 컬렉션에서 제거
+        TravelDay travelDay = travelDayRepository.findById(travelDayId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 일차", "id", travelDayId));
+        
+        travelDay.getPlaces().remove(placeToDelete);
+        placeToDelete.setTravelDay(null);
+        
+        // 6. Place 삭제
+        placeRepository.delete(placeToDelete);
+        placeRepository.flush();
+        
         log.info("장소 삭제 완료: placeId={}, userId={}", placeId, userId);
         
-        // 남은 장소들의 orderIndex 재조정
+        // 7. 남은 장소들의 orderIndex 재조정
         reorderPlacesAfterDeletion(travelDayId, deletedOrderIndex);
     }
 
@@ -191,10 +238,10 @@ public class PlaceService {
     @Transactional
     public List<PlaceDto> reorderPlaces(ReorderPlacesRequest request, Long userId) {
         // TravelPlan 권한 검증
-        TravelPlan travelPlan = travelPlanRepository.findById(request.getTravelPlanId())
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(request.getTravelPlanId())
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", request.getTravelPlanId()));
         
-        if (!travelPlan.getUser().getId().equals(userId)) {
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.EDITOR)) {
             throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
         }
         
@@ -248,7 +295,7 @@ public class PlaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
         
         // 권한 검증
-        if (!place.getTravelDay().getTravelPlan().getUser().getId().equals(userId)) {
+        if (!place.getTravelDay().getTravelPlan().hasAccess(userId)) {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
         

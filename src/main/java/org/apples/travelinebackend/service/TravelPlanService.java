@@ -75,6 +75,17 @@ public class TravelPlanService {
         }
 
         TravelPlan savedPlan = travelPlanRepository.save(travelPlan);
+        
+        // 생성자를 OWNER 멤버로 자동 추가
+        org.apples.travelinebackend.entity.TravelPlanMember ownerMember = org.apples.travelinebackend.entity.TravelPlanMember.builder()
+                .travelPlan(savedPlan)
+                .user(user)
+                .role(org.apples.travelinebackend.entity.MemberRole.OWNER)
+                .status(org.apples.travelinebackend.entity.InvitationStatus.ACCEPTED)
+                .joinedAt(java.time.LocalDateTime.now())
+                .build();
+        savedPlan.addMember(ownerMember);
+        
         return travelPlanMapper.toDto(savedPlan);
     }
 
@@ -98,16 +109,26 @@ public class TravelPlanService {
         return planPage.map(travelPlanMapper::toDto);
     }
 
-    public TravelPlanDto getTravelPlanById(Long id) {
+    public TravelPlanDto getTravelPlanById(Long id, Long userId) {
         TravelPlan travelPlan = travelPlanRepository.findByIdWithDays(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
 
-        return travelPlanMapper.toDto(travelPlan);
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
+    }
+    
+    /**
+     * 여행 계획 상세 조회 (권한 검증 포함)
+     */
+    public TravelPlanDto getTravelPlanByIdSecure(Long id, Long userId) {
+        TravelPlan travelPlan = travelPlanRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", id));
+
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
     }
 
     @Transactional
     public TravelPlanDto updateTravelPlan(Long id, UpdateTravelPlanRequest request) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
 
         boolean datesChanged = false;
@@ -170,7 +191,7 @@ public class TravelPlanService {
      */
     @Transactional
     public void deleteTravelPlan(Long id) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
         travelPlanRepository.delete(travelPlan);
     }
@@ -180,7 +201,7 @@ public class TravelPlanService {
      */
     @Transactional
     public TravelPlanDto archiveTravelPlan(Long id) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
 
         travelPlan.setIsArchived(true);
@@ -201,7 +222,7 @@ public class TravelPlanService {
     public List<TravelPlanDto> getMyTravelPlans(Long userId, TravelPlanStatus status, Boolean isArchived) {
         List<TravelPlan> plans = travelPlanRepository.findByUserIdAndFilters(userId, status, isArchived);
         return plans.stream()
-                .map(travelPlanMapper::toDto)
+                .map(plan -> travelPlanMapper.toDtoWithRole(plan, userId))
                 .collect(Collectors.toList());
     }
 
@@ -220,7 +241,7 @@ public class TravelPlanService {
             return null;
         }
         
-        return travelPlanMapper.toDto(upcomingTravels.get(0));
+        return travelPlanMapper.toDtoWithRole(upcomingTravels.get(0), userId);
     }
 
     /**
@@ -232,16 +253,16 @@ public class TravelPlanService {
      * @throws ForbiddenException       소유자가 아닌 경우
      */
     public void validateOwnership(Long planId, Long userId) {
-        TravelPlan travelPlan = travelPlanRepository.findById(planId)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(planId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
         
-        if (!travelPlan.getUser().getId().equals(userId)) {
-            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.OWNER)) {
+            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다. (소유자만 가능)");
         }
     }
 
     /**
-     * 소유자 검증과 함께 여행 계획 조회
+     * 멤버 검증과 함께 여행 계획 조회 (소유자 또는 멤버만 조회 가능)
      * 
      * @param planId 여행 계획 ID
      * @param userId 사용자 ID
@@ -251,7 +272,7 @@ public class TravelPlanService {
         TravelPlan travelPlan = travelPlanRepository.findByIdAndUserId(planId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
         
-        return travelPlanMapper.toDto(travelPlan);
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
     }
 
     /**
