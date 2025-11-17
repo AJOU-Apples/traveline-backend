@@ -13,7 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "travel_days")
+@Table(name = "travel_days", indexes = {
+        @Index(name = "idx_travelday_travelplan", columnList = "travel_plan_id"),
+        @Index(name = "idx_travelday_unique", columnList = "travel_plan_id, day_number", unique = true)
+})
 @Data
 @Builder
 @NoArgsConstructor
@@ -42,10 +45,11 @@ public class TravelDay {
     private TravelPlan travelPlan;
     
     @OneToMany(mappedBy = "travelDay", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("displayOrder ASC")
+    @OrderBy("orderIndex ASC")
     @Builder.Default
     private List<Place> places = new ArrayList<>();
     
+    // Helper methods
     public void addPlace(Place place) {
         places.add(place);
         place.setTravelDay(this);

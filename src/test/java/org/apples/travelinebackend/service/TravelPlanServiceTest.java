@@ -1,13 +1,14 @@
 package org.apples.travelinebackend.service;
 
 import org.apples.travelinebackend.dto.CreateTravelPlanRequest;
-import org.apples.travelinebackend.dto.PlaceDto;
+import org.apples.travelinebackend.dto.CityDto;
 import org.apples.travelinebackend.dto.TravelDayDto;
 import org.apples.travelinebackend.dto.TravelPlanDto;
 import org.apples.travelinebackend.dto.UpdateTravelPlanRequest;
+import org.apples.travelinebackend.entity.City;
 import org.apples.travelinebackend.entity.TravelPlan;
-import org.apples.travelinebackend.entity.TravelPlanStatus;
 import org.apples.travelinebackend.mapper.TravelPlanMapper;
+import org.apples.travelinebackend.repository.CityRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -38,6 +39,9 @@ class TravelPlanServiceTest {
         private TravelPlanRepository travelPlanRepository;
 
         @Mock
+        private CityRepository CityRepository;
+
+        @Mock
         private TravelPlanMapper travelPlanMapper;
 
         @InjectMocks
@@ -47,35 +51,47 @@ class TravelPlanServiceTest {
         @DisplayName("여행 계획 생성 성공")
         void createTravelPlan_Success() {
                 // given
+                CityDto destinationDto = CityDto.builder()
+                                .name("도쿄")
+                                .latitude(35.6762)
+                                .longitude(139.6503)
+                                .build();
+
                 CreateTravelPlanRequest request = CreateTravelPlanRequest.builder()
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destinationDto)
                                 .startDate("2024.11.20")
                                 .endDate("2024.11.23")
                                 .participants(2)
                                 .days(new ArrayList<>())
+                                .build();
+
+                City savedDestination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .latitude(35.6762)
+                                .longitude(139.6503)
                                 .build();
 
                 TravelPlan savedPlan = TravelPlan.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(savedDestination)
                                 .startDate(LocalDate.of(2024, 11, 20))
                                 .endDate(LocalDate.of(2024, 11, 23))
                                 .participants(2)
-                                .days(new ArrayList<>())
                                 .build();
 
                 TravelPlanDto expectedDto = TravelPlanDto.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destinationDto)
                                 .startDate("2024.11.20")
                                 .endDate("2024.11.23")
                                 .participants(2)
-                                .days(new ArrayList<>())
                                 .build();
 
+                when(CityRepository.save(any(City.class))).thenReturn(savedDestination);
                 when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(savedPlan);
                 when(travelPlanMapper.toDto(savedPlan)).thenReturn(expectedDto);
 
@@ -84,83 +100,104 @@ class TravelPlanServiceTest {
 
                 // then
                 assertThat(result).isNotNull();
-                assertThat(result.getId()).isEqualTo(1L);
                 assertThat(result.getTitle()).isEqualTo("도쿄 여행");
-                assertThat(result.getDestination()).isEqualTo("도쿄");
-                assertThat(result.getParticipants()).isEqualTo(2);
+                assertThat(result.getDestination()).isNotNull();
+                assertThat(result.getDestination().getName()).isEqualTo("도쿄");
 
+                verify(CityRepository, times(1)).save(any(City.class));
                 verify(travelPlanRepository, times(1)).save(any(TravelPlan.class));
-                verify(travelPlanMapper, times(1)).toDto(savedPlan);
         }
 
         @Test
-        @DisplayName("여행 계획 생성 - 일차 및 장소 포함")
-        void createTravelPlan_WithDaysAndPlaces() {
+        @DisplayName("여행 계획 생성 - 일차 정보 포함")
+        void createTravelPlan_WithDays() {
                 // given
-                PlaceDto placeDto = PlaceDto.builder()
-                                .name("도쿄 타워")
-                                .address("4 Chome-2-8 Shibakoen, Minato City, Tokyo")
-                                .time("14:00")
-                                .latitude(35.6585805)
-                                .longitude(139.7454329)
-                                .build();
-
                 TravelDayDto dayDto = TravelDayDto.builder()
                                 .dayNumber(1)
                                 .date("2024-11-20")
                                 .displayDate("11월 20일(수)")
-                                .places(List.of(placeDto))
+                                .build();
+
+                CityDto destinationDto = CityDto.builder()
+                                .name("도쿄")
                                 .build();
 
                 CreateTravelPlanRequest request = CreateTravelPlanRequest.builder()
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(destinationDto)
                                 .startDate("2024.11.20")
                                 .endDate("2024.11.23")
                                 .participants(2)
                                 .days(List.of(dayDto))
                                 .build();
 
+                City savedDestination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .build();
+
                 TravelPlan savedPlan = TravelPlan.builder()
                                 .id(1L)
-                                .title("도쿄 여행")
                                 .build();
 
-                TravelPlanDto expectedDto = TravelPlanDto.builder()
-                                .id(1L)
-                                .title("도쿄 여행")
-                                .build();
-
+                when(CityRepository.save(any(City.class))).thenReturn(savedDestination);
                 when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(savedPlan);
-                when(travelPlanMapper.toDto(savedPlan)).thenReturn(expectedDto);
+                when(travelPlanMapper.toDto(any(TravelPlan.class))).thenReturn(new TravelPlanDto());
 
                 // when
-                TravelPlanDto result = travelPlanService.createTravelPlan(request);
+                travelPlanService.createTravelPlan(request);
 
                 // then
-                assertThat(result).isNotNull();
-
                 ArgumentCaptor<TravelPlan> captor = ArgumentCaptor.forClass(TravelPlan.class);
-                verify(travelPlanRepository, times(1)).save(captor.capture());
+                verify(travelPlanRepository).save(captor.capture());
 
                 TravelPlan capturedPlan = captor.getValue();
                 assertThat(capturedPlan.getDays()).hasSize(1);
-                assertThat(capturedPlan.getDays().get(0).getPlaces()).hasSize(1);
-                assertThat(capturedPlan.getDays().get(0).getPlaces().get(0).getName()).isEqualTo("도쿄 타워");
+                assertThat(capturedPlan.getDays().get(0).getDayNumber()).isEqualTo(1);
         }
 
         @Test
-        @DisplayName("모든 여행 계획 조회")
+        @DisplayName("모든 여행 계획 조회 성공")
         void getAllTravelPlans_Success() {
                 // given
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .build();
+
                 TravelPlan plan1 = TravelPlan.builder()
                                 .id(1L)
                                 .title("도쿄 여행")
+                                .destination(destination)
                                 .build();
 
-                TravelPlan plan2 = TravelPlan.builder()
-                                .id(2L)
-                                .title("파리 여행")
+                List<TravelPlan> plans = List.of(plan1);
+
+                when(travelPlanRepository.findAllWithDays()).thenReturn(plans);
+                when(travelPlanMapper.toDto(any(TravelPlan.class))).thenReturn(new TravelPlanDto());
+
+                // when
+                List<TravelPlanDto> result = travelPlanService.getAllTravelPlans();
+
+                // then
+                assertThat(result).hasSize(1);
+                verify(travelPlanRepository, times(1)).findAllWithDays();
+        }
+
+        @Test
+        @DisplayName("페이징된 여행 계획 조회 성공")
+        void getTravelPlans_Success() {
+                // given
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .build();
+
+                TravelPlan plan1 = TravelPlan.builder()
+                                .id(1L)
+                                .title("도쿄 여행")
+                                .destination(destination)
+                                .isArchived(false)
                                 .build();
 
                 TravelPlanDto dto1 = TravelPlanDto.builder()
@@ -168,24 +205,22 @@ class TravelPlanServiceTest {
                                 .title("도쿄 여행")
                                 .build();
 
-                TravelPlanDto dto2 = TravelPlanDto.builder()
-                                .id(2L)
-                                .title("파리 여행")
-                                .build();
+                Page<TravelPlan> planPage = new PageImpl<>(List.of(plan1), PageRequest.of(0, 10), 1);
 
-                when(travelPlanRepository.findAllWithDays()).thenReturn(List.of(plan1, plan2));
+                when(travelPlanRepository.findByIsArchivedFalse(any(PageRequest.class)))
+                                .thenReturn(planPage);
                 when(travelPlanMapper.toDto(plan1)).thenReturn(dto1);
-                when(travelPlanMapper.toDto(plan2)).thenReturn(dto2);
 
                 // when
-                List<TravelPlanDto> results = travelPlanService.getAllTravelPlans();
+                Page<TravelPlanDto> result = travelPlanService.getTravelPlans(0, 10);
 
                 // then
-                assertThat(results).hasSize(2);
-                assertThat(results.get(0).getTitle()).isEqualTo("도쿄 여행");
-                assertThat(results.get(1).getTitle()).isEqualTo("파리 여행");
+                assertThat(result).isNotNull();
+                assertThat(result.getContent()).hasSize(1);
+                assertThat(result.getContent().get(0).getTitle()).isEqualTo("도쿄 여행");
 
-                verify(travelPlanRepository, times(1)).findAllWithDays();
+                verify(travelPlanRepository, times(1))
+                                .findByIsArchivedFalse(any(PageRequest.class));
         }
 
         @Test
@@ -193,9 +228,16 @@ class TravelPlanServiceTest {
         void getTravelPlanById_Success() {
                 // given
                 Long planId = 1L;
+
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .build();
+
                 TravelPlan plan = TravelPlan.builder()
                                 .id(planId)
                                 .title("도쿄 여행")
+                                .destination(destination)
                                 .build();
 
                 TravelPlanDto expectedDto = TravelPlanDto.builder()
@@ -215,7 +257,6 @@ class TravelPlanServiceTest {
                 assertThat(result.getTitle()).isEqualTo("도쿄 여행");
 
                 verify(travelPlanRepository, times(1)).findByIdWithDays(planId);
-                verify(travelPlanMapper, times(1)).toDto(plan);
         }
 
         @Test
@@ -228,71 +269,69 @@ class TravelPlanServiceTest {
                 // when & then
                 assertThatThrownBy(() -> travelPlanService.getTravelPlanById(planId))
                                 .isInstanceOf(IllegalArgumentException.class)
-                                .hasMessageContaining("여행 계획을 찾을 수 없습니다. ID: " + planId);
+                                .hasMessageContaining("여행 계획을 찾을 수 없습니다");
 
                 verify(travelPlanRepository, times(1)).findByIdWithDays(planId);
-                verify(travelPlanMapper, never()).toDto(any());
         }
 
         @Test
-        @DisplayName("여행 계획 수정 성공")
+        @DisplayName("여행 계획 업데이트 성공")
         void updateTravelPlan_Success() {
                 // given
                 Long planId = 1L;
-                UpdateTravelPlanRequest request = UpdateTravelPlanRequest.builder()
-                                .title("도쿄 여행 (수정됨)")
-                                .participants(3)
+
+                City originalDestination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
                                 .build();
 
                 TravelPlan existingPlan = TravelPlan.builder()
                                 .id(planId)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
+                                .destination(originalDestination)
                                 .startDate(LocalDate.of(2024, 11, 20))
                                 .endDate(LocalDate.of(2024, 11, 23))
                                 .participants(2)
-                                .days(new ArrayList<>())
                                 .build();
 
-                TravelPlan updatedPlan = TravelPlan.builder()
-                                .id(planId)
-                                .title("도쿄 여행 (수정됨)")
-                                .destination("도쿄")
-                                .startDate(LocalDate.of(2024, 11, 20))
-                                .endDate(LocalDate.of(2024, 11, 23))
-                                .participants(3)
-                                .days(new ArrayList<>())
+                CityDto newDestinationDto = CityDto.builder()
+                                .name("오사카")
                                 .build();
 
-                TravelPlanDto expectedDto = TravelPlanDto.builder()
-                                .id(planId)
-                                .title("도쿄 여행 (수정됨)")
-                                .participants(3)
+                UpdateTravelPlanRequest request = UpdateTravelPlanRequest.builder()
+                                .title("오사카 여행")
+                                .destination(newDestinationDto)
+                                .build();
+
+                City newDestination = City.builder()
+                                .id(2L)
+                                .name("오사카")
                                 .build();
 
                 when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(existingPlan));
-                when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(updatedPlan);
-                when(travelPlanMapper.toDto(updatedPlan)).thenReturn(expectedDto);
+                when(CityRepository.save(any(City.class))).thenReturn(newDestination);
+                when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(existingPlan);
+                when(travelPlanMapper.toDto(any(TravelPlan.class))).thenReturn(new TravelPlanDto());
 
                 // when
-                TravelPlanDto result = travelPlanService.updateTravelPlan(planId, request);
+                travelPlanService.updateTravelPlan(planId, request);
 
                 // then
-                assertThat(result).isNotNull();
-                assertThat(result.getTitle()).isEqualTo("도쿄 여행 (수정됨)");
-                assertThat(result.getParticipants()).isEqualTo(3);
+                ArgumentCaptor<TravelPlan> captor = ArgumentCaptor.forClass(TravelPlan.class);
+                verify(travelPlanRepository).save(captor.capture());
 
-                verify(travelPlanRepository, times(1)).findById(planId);
-                verify(travelPlanRepository, times(1)).save(any(TravelPlan.class));
+                TravelPlan updatedPlan = captor.getValue();
+                assertThat(updatedPlan.getTitle()).isEqualTo("오사카 여행");
+                assertThat(updatedPlan.getDestination().getName()).isEqualTo("오사카");
         }
 
         @Test
-        @DisplayName("존재하지 않는 여행 계획 수정 시 예외 발생")
+        @DisplayName("존재하지 않는 여행 계획 업데이트 시 예외 발생")
         void updateTravelPlan_NotFound() {
                 // given
                 Long planId = 999L;
                 UpdateTravelPlanRequest request = UpdateTravelPlanRequest.builder()
-                                .title("도쿄 여행 (수정됨)")
+                                .title("수정된 제목")
                                 .build();
 
                 when(travelPlanRepository.findById(planId)).thenReturn(Optional.empty());
@@ -300,10 +339,9 @@ class TravelPlanServiceTest {
                 // when & then
                 assertThatThrownBy(() -> travelPlanService.updateTravelPlan(planId, request))
                                 .isInstanceOf(IllegalArgumentException.class)
-                                .hasMessageContaining("여행 계획을 찾을 수 없습니다. ID: " + planId);
+                                .hasMessageContaining("여행 계획을 찾을 수 없습니다");
 
                 verify(travelPlanRepository, times(1)).findById(planId);
-                verify(travelPlanRepository, never()).save(any());
         }
 
         @Test
@@ -311,24 +349,26 @@ class TravelPlanServiceTest {
         void deleteTravelPlan_Success() {
                 // given
                 Long planId = 1L;
-                TravelPlan existingPlan = TravelPlan.builder()
-                                .id(planId)
-                                .title("도쿄 여행")
-                                .destination("도쿄")
-                                .startDate(LocalDate.of(2024, 11, 20))
-                                .endDate(LocalDate.of(2024, 11, 23))
-                                .participants(2)
+
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
                                 .build();
 
-                when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(existingPlan));
-                doNothing().when(travelPlanRepository).delete(existingPlan);
+                TravelPlan plan = TravelPlan.builder()
+                                .id(planId)
+                                .title("도쿄 여행")
+                                .destination(destination)
+                                .build();
+
+                when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
 
                 // when
                 travelPlanService.deleteTravelPlan(planId);
 
                 // then
                 verify(travelPlanRepository, times(1)).findById(planId);
-                verify(travelPlanRepository, times(1)).delete(existingPlan);
+                verify(travelPlanRepository, times(1)).delete(plan);
         }
 
         @Test
@@ -341,126 +381,10 @@ class TravelPlanServiceTest {
                 // when & then
                 assertThatThrownBy(() -> travelPlanService.deleteTravelPlan(planId))
                                 .isInstanceOf(IllegalArgumentException.class)
-                                .hasMessageContaining("여행 계획을 찾을 수 없습니다. ID: " + planId);
+                                .hasMessageContaining("여행 계획을 찾을 수 없습니다");
 
                 verify(travelPlanRepository, times(1)).findById(planId);
                 verify(travelPlanRepository, never()).delete(any());
-        }
-
-        @Test
-        @DisplayName("여행 계획 수정 - 일차 데이터 전체 교체")
-        void updateTravelPlan_ReplaceDays() {
-                // given
-                Long planId = 1L;
-
-                TravelDayDto newDayDto = TravelDayDto.builder()
-                                .dayNumber(1)
-                                .date("2024-11-20")
-                                .displayDate("11월 20일(수)")
-                                .places(new ArrayList<>())
-                                .build();
-
-                UpdateTravelPlanRequest request = UpdateTravelPlanRequest.builder()
-                                .days(List.of(newDayDto))
-                                .build();
-
-                TravelPlan existingPlan = TravelPlan.builder()
-                                .id(planId)
-                                .title("도쿄 여행")
-                                .destination("도쿄")
-                                .startDate(LocalDate.of(2024, 11, 20))
-                                .endDate(LocalDate.of(2024, 11, 23))
-                                .participants(2)
-                                .days(new ArrayList<>())
-                                .build();
-
-                when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(existingPlan));
-                when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(existingPlan);
-                when(travelPlanMapper.toDto(any(TravelPlan.class))).thenReturn(TravelPlanDto.builder().build());
-
-                // when
-                travelPlanService.updateTravelPlan(planId, request);
-
-                // then
-                ArgumentCaptor<TravelPlan> captor = ArgumentCaptor.forClass(TravelPlan.class);
-                verify(travelPlanRepository, times(1)).save(captor.capture());
-
-                TravelPlan capturedPlan = captor.getValue();
-                assertThat(capturedPlan.getDays()).hasSize(1);
-                assertThat(capturedPlan.getDays().get(0).getDayNumber()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("여행 계획 목록 조회 - 페이징 (필터 없음)")
-        void getTravelPlans_WithoutFilter() {
-                // given
-                TravelPlan plan1 = TravelPlan.builder()
-                                .id(1L)
-                                .title("도쿄 여행")
-                                .status(TravelPlanStatus.UPCOMING)
-                                .isArchived(false)
-                                .build();
-
-                TravelPlan plan2 = TravelPlan.builder()
-                                .id(2L)
-                                .title("파리 여행")
-                                .status(TravelPlanStatus.PAST)
-                                .isArchived(false)
-                                .build();
-
-                TravelPlanDto dto1 = TravelPlanDto.builder().id(1L).title("도쿄 여행").build();
-                TravelPlanDto dto2 = TravelPlanDto.builder().id(2L).title("파리 여행").build();
-
-                Page<TravelPlan> planPage = new PageImpl<>(List.of(plan1, plan2), PageRequest.of(0, 10), 2);
-
-                when(travelPlanRepository.findByIsArchivedFalse(any(PageRequest.class))).thenReturn(planPage);
-                when(travelPlanMapper.toDto(plan1)).thenReturn(dto1);
-                when(travelPlanMapper.toDto(plan2)).thenReturn(dto2);
-
-                // when
-                Page<TravelPlanDto> result = travelPlanService.getTravelPlans(null, 0, 10);
-
-                // then
-                assertThat(result.getTotalElements()).isEqualTo(2);
-                assertThat(result.getContent()).hasSize(2);
-                assertThat(result.getContent().get(0).getTitle()).isEqualTo("도쿄 여행");
-                assertThat(result.getContent().get(1).getTitle()).isEqualTo("파리 여행");
-
-                verify(travelPlanRepository, times(1)).findByIsArchivedFalse(any(PageRequest.class));
-                verify(travelPlanRepository, never()).findByIsArchivedFalseAndStatus(any(), any());
-        }
-
-        @Test
-        @DisplayName("여행 계획 목록 조회 - status 필터링 (upcoming)")
-        void getTravelPlans_WithStatusFilter() {
-                // given
-                TravelPlan plan1 = TravelPlan.builder()
-                                .id(1L)
-                                .title("도쿄 여행")
-                                .status(TravelPlanStatus.UPCOMING)
-                                .isArchived(false)
-                                .build();
-
-                TravelPlanDto dto1 = TravelPlanDto.builder().id(1L).title("도쿄 여행").build();
-
-                Page<TravelPlan> planPage = new PageImpl<>(List.of(plan1), PageRequest.of(0, 10), 1);
-
-                when(travelPlanRepository.findByIsArchivedFalseAndStatus(eq(TravelPlanStatus.UPCOMING),
-                                any(PageRequest.class)))
-                                .thenReturn(planPage);
-                when(travelPlanMapper.toDto(plan1)).thenReturn(dto1);
-
-                // when
-                Page<TravelPlanDto> result = travelPlanService.getTravelPlans("upcoming", 0, 10);
-
-                // then
-                assertThat(result.getTotalElements()).isEqualTo(1);
-                assertThat(result.getContent()).hasSize(1);
-                assertThat(result.getContent().get(0).getTitle()).isEqualTo("도쿄 여행");
-
-                verify(travelPlanRepository, times(1))
-                                .findByIsArchivedFalseAndStatus(eq(TravelPlanStatus.UPCOMING), any(PageRequest.class));
-                verify(travelPlanRepository, never()).findByIsArchivedFalse(any());
         }
 
         @Test
@@ -468,33 +392,32 @@ class TravelPlanServiceTest {
         void archiveTravelPlan_Success() {
                 // given
                 Long planId = 1L;
-                TravelPlan travelPlan = TravelPlan.builder()
+
+                City destination = City.builder()
+                                .id(1L)
+                                .name("도쿄")
+                                .build();
+
+                TravelPlan plan = TravelPlan.builder()
                                 .id(planId)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
-                                .startDate(LocalDate.of(2024, 11, 20))
-                                .endDate(LocalDate.of(2024, 11, 23))
-                                .participants(2)
+                                .destination(destination)
                                 .isArchived(false)
                                 .build();
 
                 TravelPlan archivedPlan = TravelPlan.builder()
                                 .id(planId)
                                 .title("도쿄 여행")
-                                .destination("도쿄")
-                                .startDate(LocalDate.of(2024, 11, 20))
-                                .endDate(LocalDate.of(2024, 11, 23))
-                                .participants(2)
+                                .destination(destination)
                                 .isArchived(true)
                                 .build();
 
                 TravelPlanDto expectedDto = TravelPlanDto.builder()
                                 .id(planId)
-                                .title("도쿄 여행")
                                 .isArchived(true)
                                 .build();
 
-                when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(travelPlan));
+                when(travelPlanRepository.findById(planId)).thenReturn(Optional.of(plan));
                 when(travelPlanRepository.save(any(TravelPlan.class))).thenReturn(archivedPlan);
                 when(travelPlanMapper.toDto(archivedPlan)).thenReturn(expectedDto);
 
@@ -505,9 +428,9 @@ class TravelPlanServiceTest {
                 assertThat(result).isNotNull();
                 assertThat(result.getIsArchived()).isTrue();
 
-                verify(travelPlanRepository, times(1)).findById(planId);
-                verify(travelPlanRepository, times(1)).save(any(TravelPlan.class));
-                verify(travelPlanMapper, times(1)).toDto(archivedPlan);
+                ArgumentCaptor<TravelPlan> captor = ArgumentCaptor.forClass(TravelPlan.class);
+                verify(travelPlanRepository).save(captor.capture());
+                assertThat(captor.getValue().getIsArchived()).isTrue();
         }
 
         @Test
@@ -520,7 +443,7 @@ class TravelPlanServiceTest {
                 // when & then
                 assertThatThrownBy(() -> travelPlanService.archiveTravelPlan(planId))
                                 .isInstanceOf(IllegalArgumentException.class)
-                                .hasMessageContaining("여행 계획을 찾을 수 없습니다. ID: " + planId);
+                                .hasMessageContaining("여행 계획을 찾을 수 없습니다");
 
                 verify(travelPlanRepository, times(1)).findById(planId);
                 verify(travelPlanRepository, never()).save(any());

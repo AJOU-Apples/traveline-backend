@@ -4,11 +4,15 @@ import lombok.RequiredArgsConstructor;
 import org.apples.travelinebackend.dto.CreateTravelPlanRequest;
 import org.apples.travelinebackend.dto.TravelPlanDto;
 import org.apples.travelinebackend.dto.UpdateTravelPlanRequest;
-import org.apples.travelinebackend.entity.Place;
+import org.apples.travelinebackend.entity.City;
 import org.apples.travelinebackend.entity.TravelDay;
 import org.apples.travelinebackend.entity.TravelPlan;
 import org.apples.travelinebackend.entity.TravelPlanStatus;
+import org.apples.travelinebackend.entity.User;
+import org.apples.travelinebackend.exception.ForbiddenException;
+import org.apples.travelinebackend.exception.ResourceNotFoundException;
 import org.apples.travelinebackend.mapper.TravelPlanMapper;
+import org.apples.travelinebackend.repository.CityRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,137 +22,149 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TravelPlanService {
-    
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy.MM.dd");
-    
+
     private final TravelPlanRepository travelPlanRepository;
+    private final CityRepository cityRepository;
     private final TravelPlanMapper travelPlanMapper;
-    
+
     @Transactional
-    public TravelPlanDto createTravelPlan(CreateTravelPlanRequest request) {
-        LocalDate startDate = LocalDate.parse(request.getStartDate(), DATE_FORMATTER);
-        LocalDate endDate = LocalDate.parse(request.getEndDate(), DATE_FORMATTER);
-        
+    public TravelPlanDto createTravelPlan(CreateTravelPlanRequest request, User user) {
+        LocalDate startDate = LocalDate.parse(request.getStartDate());
+        LocalDate endDate = LocalDate.parse(request.getEndDate());
+
+        // destination City 조회
+        City destination = null;
+        if (request.getDestinationId() != null) {
+            destination = cityRepository.findById(request.getDestinationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("도시", "id", request.getDestinationId()));
+        }
+
         TravelPlan travelPlan = TravelPlan.builder()
                 .title(request.getTitle())
-                .destination(request.getDestination())
+                .destination(destination)
                 .startDate(startDate)
                 .endDate(endDate)
                 .participants(request.getParticipants())
-                .status(calculateStatus(startDate, endDate))
+                .user(user)  // User 정보 추가
                 .build();
-        
+
         // 일차별 데이터 추가
-        if (request.getDays() != null) {
+        if (request.getDays() != null && !request.getDays().isEmpty()) {
             request.getDays().forEach(dayDto -> {
                 TravelDay travelDay = TravelDay.builder()
                         .dayNumber(dayDto.getDayNumber())
                         .date(LocalDate.parse(dayDto.getDate()))
                         .displayDate(dayDto.getDisplayDate())
                         .build();
-                
-                // 장소 데이터 추가
-                if (dayDto.getPlaces() != null) {
-                    dayDto.getPlaces().forEach(placeDto -> {
-                        Place place = Place.builder()
-                                .name(placeDto.getName())
-                                .address(placeDto.getAddress())
-                                .time(placeDto.getTime())
-                                .memo(placeDto.getMemo())
-                                .latitude(placeDto.getLatitude())
-                                .longitude(placeDto.getLongitude())
-                                .build();
-                        travelDay.addPlace(place);
-                    });
-                }
-                
+
                 travelPlan.addDay(travelDay);
             });
+        } else {
+            // request.getDays()가 null이거나 비어있으면 자동 생성
+            List<TravelDay> generatedDays = generateTravelDays(startDate, endDate);
+            generatedDays.forEach(travelPlan::addDay);
         }
-        
+
         TravelPlan savedPlan = travelPlanRepository.save(travelPlan);
+        
+        // 생성자를 OWNER 멤버로 자동 추가
+        org.apples.travelinebackend.entity.TravelPlanMember ownerMember = org.apples.travelinebackend.entity.TravelPlanMember.builder()
+                .travelPlan(savedPlan)
+                .user(user)
+                .role(org.apples.travelinebackend.entity.MemberRole.OWNER)
+                .status(org.apples.travelinebackend.entity.InvitationStatus.ACCEPTED)
+                .joinedAt(java.time.LocalDateTime.now())
+                .build();
+        savedPlan.addMember(ownerMember);
+        
         return travelPlanMapper.toDto(savedPlan);
     }
-    
+
     public List<TravelPlanDto> getAllTravelPlans() {
         return travelPlanRepository.findAllWithDays().stream()
                 .map(travelPlanMapper::toDto)
                 .collect(Collectors.toList());
     }
-    
+
     /**
-     * 여행 계획 목록 조회 (필터링 및 페이징 지원)
-     * @param status 여행 상태 필터 (optional)
-     * @param page 페이지 번호 (0부터 시작)
+     * 여행 계획 목록 조회 (페이징 지원)
+     * 
+     * @param page  페이지 번호 (0부터 시작)
      * @param limit 페이지 당 개수
      * @return 페이징된 여행 계획 목록
      */
-    public Page<TravelPlanDto> getTravelPlans(String status, int page, int limit) {
+    public Page<TravelPlanDto> getTravelPlans(int page, int limit) {
         Pageable pageable = PageRequest.of(page, limit);
-        Page<TravelPlan> planPage;
-        
-        if (status != null && !status.isEmpty()) {
-            TravelPlanStatus planStatus = TravelPlanStatus.valueOf(status.toUpperCase());
-            planPage = travelPlanRepository.findByIsArchivedFalseAndStatus(planStatus, pageable);
-        } else {
-            planPage = travelPlanRepository.findByIsArchivedFalse(pageable);
-        }
-        
+        Page<TravelPlan> planPage = travelPlanRepository.findByIsArchivedFalse(pageable);
+
         return planPage.map(travelPlanMapper::toDto);
     }
-    
-    public TravelPlanDto getTravelPlanById(Long id) {
+
+    public TravelPlanDto getTravelPlanById(Long id, Long userId) {
         TravelPlan travelPlan = travelPlanRepository.findByIdWithDays(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
-        
-        // Places는 Lazy Loading으로 자동 로드됨 (트랜잭션 내에서)
-        travelPlan.getDays().forEach(day -> day.getPlaces().size());
-        
-        return travelPlanMapper.toDto(travelPlan);
+
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
     }
     
+    /**
+     * 여행 계획 상세 조회 (권한 검증 포함)
+     */
+    public TravelPlanDto getTravelPlanByIdSecure(Long id, Long userId) {
+        TravelPlan travelPlan = travelPlanRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", id));
+
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
+    }
+
     @Transactional
     public TravelPlanDto updateTravelPlan(Long id, UpdateTravelPlanRequest request) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
-        
-        LocalDate startDate = travelPlan.getStartDate();
-        LocalDate endDate = travelPlan.getEndDate();
+
+        boolean datesChanged = false;
         
         // 기본 정보 업데이트
         if (request.getTitle() != null) {
             travelPlan.setTitle(request.getTitle());
         }
-        if (request.getDestination() != null) {
-            travelPlan.setDestination(request.getDestination());
+        if (request.getDestinationId() != null) {
+            City destination = cityRepository.findById(request.getDestinationId())
+                    .orElseThrow(() -> new ResourceNotFoundException("도시", "id", request.getDestinationId()));
+            travelPlan.setDestination(destination);
         }
         if (request.getStartDate() != null) {
-            startDate = LocalDate.parse(request.getStartDate(), DATE_FORMATTER);
-            travelPlan.setStartDate(startDate);
+            LocalDate startDate = LocalDate.parse(request.getStartDate());
+            if (!startDate.equals(travelPlan.getStartDate())) {
+                travelPlan.setStartDate(startDate);
+                datesChanged = true;
+            }
         }
         if (request.getEndDate() != null) {
-            endDate = LocalDate.parse(request.getEndDate(), DATE_FORMATTER);
-            travelPlan.setEndDate(endDate);
+            LocalDate endDate = LocalDate.parse(request.getEndDate());
+            if (!endDate.equals(travelPlan.getEndDate())) {
+                travelPlan.setEndDate(endDate);
+                datesChanged = true;
+            }
         }
         if (request.getParticipants() != null) {
             travelPlan.setParticipants(request.getParticipants());
         }
-        
-        // 날짜가 변경된 경우 상태 재계산
-        travelPlan.setStatus(calculateStatus(startDate, endDate));
-        
+
         // 일차별 데이터 업데이트 (전체 교체)
         if (request.getDays() != null) {
             // 기존 일차 데이터 제거
             travelPlan.getDays().clear();
-            
+
             // 새로운 일차 데이터 추가
             request.getDays().forEach(dayDto -> {
                 TravelDay travelDay = TravelDay.builder()
@@ -156,66 +172,185 @@ public class TravelPlanService {
                         .date(LocalDate.parse(dayDto.getDate()))
                         .displayDate(dayDto.getDisplayDate())
                         .build();
-                
-                // 장소 데이터 추가
-                if (dayDto.getPlaces() != null) {
-                    dayDto.getPlaces().forEach(placeDto -> {
-                        Place place = Place.builder()
-                                .name(placeDto.getName())
-                                .address(placeDto.getAddress())
-                                .time(placeDto.getTime())
-                                .memo(placeDto.getMemo())
-                                .latitude(placeDto.getLatitude())
-                                .longitude(placeDto.getLongitude())
-                                .build();
-                        travelDay.addPlace(place);
-                    });
-                }
-                
+
                 travelPlan.addDay(travelDay);
             });
+        } else if (datesChanged) {
+            // 날짜가 변경되었고 days가 제공되지 않은 경우, TravelDay의 date를 업데이트
+            travelPlan.getDays().clear();
+            List<TravelDay> regeneratedDays = generateTravelDays(travelPlan.getStartDate(), travelPlan.getEndDate());
+            regeneratedDays.forEach(travelPlan::addDay);
         }
-        
+
         TravelPlan updatedPlan = travelPlanRepository.save(travelPlan);
         return travelPlanMapper.toDto(updatedPlan);
     }
-    
+
     /**
      * 여행 계획 삭제 (Soft Delete)
      */
     @Transactional
     public void deleteTravelPlan(Long id) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
-        travelPlanRepository.delete(travelPlan); // @SQLDelete에 의해 soft delete 수행
+        travelPlanRepository.delete(travelPlan);
     }
-    
+
     /**
      * 여행 계획 아카이브
      */
     @Transactional
     public TravelPlanDto archiveTravelPlan(Long id) {
-        TravelPlan travelPlan = travelPlanRepository.findById(id)
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(id)
                 .orElseThrow(() -> new IllegalArgumentException("여행 계획을 찾을 수 없습니다. ID: " + id));
-        
+
         travelPlan.setIsArchived(true);
         TravelPlan archivedPlan = travelPlanRepository.save(travelPlan);
         return travelPlanMapper.toDto(archivedPlan);
     }
-    
+
+    // ==================== User 기반 메서드 ====================
+
     /**
-     * 여행 날짜를 기반으로 상태 계산
+     * 내 여행 계획 목록 조회 (필터링 지원)
+     * 
+     * @param userId     사용자 ID
+     * @param status     여행 상태 (null이면 전체)
+     * @param isArchived 아카이브 여부 (null이면 전체)
+     * @return 필터링된 여행 계획 목록
      */
-    private TravelPlanStatus calculateStatus(LocalDate startDate, LocalDate endDate) {
+    public List<TravelPlanDto> getMyTravelPlans(Long userId, TravelPlanStatus status, Boolean isArchived) {
+        List<TravelPlan> plans = travelPlanRepository.findByUserIdAndFilters(userId, status, isArchived);
+        return plans.stream()
+                .map(plan -> travelPlanMapper.toDtoWithRole(plan, userId))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 다가오는 여행 조회 (D-day용)
+     * 가장 가까운 시작일을 가진 여행 계획 반환
+     * 
+     * @param userId 사용자 ID
+     * @return 다가오는 여행 계획 (없으면 null)
+     */
+    public TravelPlanDto getUpcomingTravel(Long userId) {
         LocalDate today = LocalDate.now();
+        List<TravelPlan> upcomingTravels = travelPlanRepository.findUpcomingTravelsByUserId(userId, today);
         
-        if (today.isBefore(startDate)) {
-            return TravelPlanStatus.UPCOMING;
-        } else if (today.isAfter(endDate)) {
-            return TravelPlanStatus.PAST;
-        } else {
-            return TravelPlanStatus.ONGOING;
+        if (upcomingTravels.isEmpty()) {
+            return null;
+        }
+        
+        return travelPlanMapper.toDtoWithRole(upcomingTravels.get(0), userId);
+    }
+
+    /**
+     * 여행 계획 소유자 권한 검증
+     * 
+     * @param planId 여행 계획 ID
+     * @param userId 사용자 ID
+     * @throws ResourceNotFoundException 여행 계획을 찾을 수 없는 경우
+     * @throws ForbiddenException       소유자가 아닌 경우
+     */
+    public void validateOwnership(Long planId, Long userId) {
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
+        
+        if (!travelPlan.hasRole(userId, org.apples.travelinebackend.entity.MemberRole.OWNER)) {
+            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다. (소유자만 가능)");
         }
     }
-}
 
+    /**
+     * 멤버 검증과 함께 여행 계획 조회 (소유자 또는 멤버만 조회 가능)
+     * 
+     * @param planId 여행 계획 ID
+     * @param userId 사용자 ID
+     * @return 여행 계획 DTO
+     */
+    public TravelPlanDto getTravelPlanByIdWithAuth(Long planId, Long userId) {
+        TravelPlan travelPlan = travelPlanRepository.findByIdAndUserId(planId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
+        
+        return travelPlanMapper.toDtoWithRole(travelPlan, userId);
+    }
+
+    /**
+     * 소유자 검증과 함께 여행 계획 수정
+     * 
+     * @param planId  여행 계획 ID
+     * @param request 수정 요청
+     * @param userId  사용자 ID
+     * @return 수정된 여행 계획 DTO
+     */
+    @Transactional
+    public TravelPlanDto updateTravelPlanWithAuth(Long planId, UpdateTravelPlanRequest request, Long userId) {
+        validateOwnership(planId, userId);
+        return updateTravelPlan(planId, request);
+    }
+
+    /**
+     * 소유자 검증과 함께 여행 계획 삭제
+     * 
+     * @param planId 여행 계획 ID
+     * @param userId 사용자 ID
+     */
+    @Transactional
+    public void deleteTravelPlanWithAuth(Long planId, Long userId) {
+        validateOwnership(planId, userId);
+        deleteTravelPlan(planId);
+    }
+
+    /**
+     * 소유자 검증과 함께 여행 계획 아카이브
+     * 
+     * @param planId 여행 계획 ID
+     * @param userId 사용자 ID
+     * @return 아카이브된 여행 계획 DTO
+     */
+    @Transactional
+    public TravelPlanDto archiveTravelPlanWithAuth(Long planId, Long userId) {
+        validateOwnership(planId, userId);
+        return archiveTravelPlan(planId);
+    }
+
+    // ==================== Helper Methods ====================
+
+    /**
+     * startDate부터 endDate까지 TravelDay 자동 생성
+     * 
+     * @param startDate 시작일
+     * @param endDate   종료일
+     * @return 생성된 TravelDay 목록
+     */
+    private List<TravelDay> generateTravelDays(LocalDate startDate, LocalDate endDate) {
+        List<TravelDay> travelDays = new ArrayList<>();
+        int dayNumber = 1;
+        LocalDate currentDate = startDate;
+
+        while (!currentDate.isAfter(endDate)) {
+            TravelDay travelDay = TravelDay.builder()
+                    .dayNumber(dayNumber)
+                    .date(currentDate)
+                    .displayDate(formatDisplayDate(currentDate))
+                    .build();
+            
+            travelDays.add(travelDay);
+            currentDate = currentDate.plusDays(1);
+            dayNumber++;
+        }
+
+        return travelDays;
+    }
+
+    /**
+     * 날짜를 "11월 20일(수)" 형식으로 포맷
+     * 
+     * @param date 날짜
+     * @return 포맷된 날짜 문자열
+     */
+    private String formatDisplayDate(LocalDate date) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("M월 d일(E)", Locale.KOREAN);
+        return date.format(formatter);
+    }
+}

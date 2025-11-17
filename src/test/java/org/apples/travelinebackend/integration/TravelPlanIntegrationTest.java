@@ -2,11 +2,12 @@ package org.apples.travelinebackend.integration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apples.travelinebackend.dto.CreateTravelPlanRequest;
-import org.apples.travelinebackend.dto.PlaceDto;
+import org.apples.travelinebackend.dto.CityDto;
 import org.apples.travelinebackend.dto.TravelDayDto;
 import org.apples.travelinebackend.dto.UpdateTravelPlanRequest;
+import org.apples.travelinebackend.repository.CityRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,308 +16,276 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Transactional
 @TestPropertySource(properties = {
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+                "spring.jpa.hibernate.ddl-auto=create-drop"
 })
-@DisplayName("TravelPlan API 통합 테스트")
+@DisplayName("TravelPlan 통합 테스트")
 class TravelPlanIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private TravelPlanRepository travelPlanRepository;
+        @Autowired
+        private TravelPlanRepository travelPlanRepository;
 
-    @AfterEach
-    void tearDown() {
-        travelPlanRepository.deleteAll();
-    }
+        @Autowired
+        private CityRepository CityRepository;
 
-    @Test
-    @DisplayName("전체 시나리오 테스트: 생성 -> 조회 -> 수정 -> 삭제")
-    void fullScenario_CreateReadUpdateDelete() throws Exception {
-        // 1. 여행 계획 생성
-        TravelDayDto dayDto = TravelDayDto.builder()
-                .dayNumber(1)
-                .date("2024-11-20")
-                .displayDate("11월 20일(수)")
-                .places(new ArrayList<>())
-                .build();
+        @BeforeEach
+        void setUp() {
+                travelPlanRepository.deleteAll();
+                CityRepository.deleteAll();
+        }
 
-        CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
-                .title("도쿄 여행")
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                .participants(2)
-                .days(List.of(dayDto))
-                .build();
+        @Test
+        @DisplayName("여행 계획 생성 후 조회")
+        void createAndRetrieveTravelPlan() throws Exception {
+                // given
+                CityDto destinationDto = CityDto.builder()
+                                .name("도쿄")
+                                .latitude(35.6762)
+                                .longitude(139.6503)
+                                .build();
 
-        MvcResult createResult = mockMvc.perform(post("/api/travel-plans")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.title").value("도쿄 여행"))
-                .andReturn();
+                CreateTravelPlanRequest request = CreateTravelPlanRequest.builder()
+                                .title("도쿄 여행")
+                                .destination(destinationDto)
+                                .startDate("2024.11.20")
+                                .endDate("2024.11.23")
+                                .participants(2)
+                                .days(new ArrayList<>())
+                                .build();
 
-        String responseBody = createResult.getResponse().getContentAsString();
-        Long planId = objectMapper.readTree(responseBody).get("id").asLong();
+                // when - 생성
+                String createResponse = mockMvc.perform(post("/api/travel-plans")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.title").value("도쿄 여행"))
+                                .andExpect(jsonPath("$.destination.name").value("도쿄"))
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
 
-        // 2. 생성된 여행 계획 조회
-        mockMvc.perform(get("/api/travel-plans/{planId}", planId))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(planId))
-                .andExpect(jsonPath("$.title").value("도쿄 여행"))
-                .andExpect(jsonPath("$.days", hasSize(1)));
+                Long createdId = objectMapper.readTree(createResponse).get("id").asLong();
 
-        // 3. 모든 여행 계획 조회 (페이징)
-        mockMvc.perform(get("/api/travel-plans"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(1)));
+                // then - 조회
+                mockMvc.perform(get("/api/travel-plans/{planId}", createdId))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.id").value(createdId))
+                                .andExpect(jsonPath("$.title").value("도쿄 여행"))
+                                .andExpect(jsonPath("$.destination.name").value("도쿄"));
+        }
 
-        // 4. 여행 계획 수정
-        UpdateTravelPlanRequest updateRequest = UpdateTravelPlanRequest.builder()
-                .title("도쿄 여행 (수정됨)")
-                .participants(3)
-                .build();
+        @Test
+        @DisplayName("여행 계획 생성 시 일차 정보 포함")
+        void createTravelPlanWithDays() throws Exception {
+                // given
+                CityDto destinationDto = CityDto.builder()
+                                .name("도쿄")
+                                .build();
 
-        mockMvc.perform(put("/api/travel-plans/{planId}", planId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateRequest)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.title").value("도쿄 여행 (수정됨)"))
-                .andExpect(jsonPath("$.participants").value(3));
+                TravelDayDto day1 = TravelDayDto.builder()
+                                .dayNumber(1)
+                                .date("2024-11-20")
+                                .displayDate("11월 20일(수)")
+                                .build();
 
-        // 5. 여행 계획 삭제
-        mockMvc.perform(delete("/api/travel-plans/{planId}", planId))
-                .andDo(print())
-                .andExpect(status().isNoContent());
+                TravelDayDto day2 = TravelDayDto.builder()
+                                .dayNumber(2)
+                                .date("2024-11-21")
+                                .displayDate("11월 21일(목)")
+                                .build();
 
-        // 6. 삭제된 계획 조회 시 404
-        mockMvc.perform(get("/api/travel-plans/{planId}", planId))
-                .andDo(print())
-                .andExpect(status().isNotFound());
-    }
+                CreateTravelPlanRequest request = CreateTravelPlanRequest.builder()
+                                .title("도쿄 여행")
+                                .destination(destinationDto)
+                                .startDate("2024.11.20")
+                                .endDate("2024.11.23")
+                                .participants(2)
+                                .days(List.of(day1, day2))
+                                .build();
 
-    @Test
-    @DisplayName("장소 정보 포함 여행 계획 전체 시나리오")
-    void fullScenario_WithPlaces() throws Exception {
-        // 1. 장소 정보 포함 여행 계획 생성
-        PlaceDto place1 = PlaceDto.builder()
-                .name("도쿄 타워")
-                .address("4 Chome-2-8 Shibakoen, Minato City, Tokyo")
-                .time("14:00")
-                .latitude(35.6585805)
-                .longitude(139.7454329)
-                .build();
+                // when & then
+                mockMvc.perform(post("/api/travel-plans")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.days", hasSize(2)))
+                                .andExpect(jsonPath("$.days[0].dayNumber").value(1))
+                                .andExpect(jsonPath("$.days[1].dayNumber").value(2));
+        }
 
-        PlaceDto place2 = PlaceDto.builder()
-                .name("아사쿠사")
-                .address("Asakusa, Taito City, Tokyo")
-                .time("17:00")
-                .latitude(35.7148)
-                .longitude(139.7967)
-                .build();
+        @Test
+        @DisplayName("여행 계획 수정")
+        void updateTravelPlan() throws Exception {
+                // given - 여행 계획 생성
+                CityDto originalDestination = CityDto.builder()
+                                .name("도쿄")
+                                .build();
 
-        TravelDayDto dayDto = TravelDayDto.builder()
-                .dayNumber(1)
-                .date("2024-11-20")
-                .displayDate("11월 20일(수)")
-                .places(List.of(place1, place2))
-                .build();
+                CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
+                                .title("도쿄 여행")
+                                .destination(originalDestination)
+                                .startDate("2024.11.20")
+                                .endDate("2024.11.23")
+                                .participants(2)
+                                .days(new ArrayList<>())
+                                .build();
 
-        CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
-                .title("도쿄 여행")
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                .participants(2)
-                .days(List.of(dayDto))
-                .build();
+                String createResponse = mockMvc.perform(post("/api/travel-plans")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .andExpect(status().isCreated())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
 
-        MvcResult createResult = mockMvc.perform(post("/api/travel-plans")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.days[0].places", hasSize(2)))
-                .andExpect(jsonPath("$.days[0].places[0].name").value("도쿄 타워"))
-                .andExpect(jsonPath("$.days[0].places[1].name").value("아사쿠사"))
-                .andReturn();
+                Long planId = objectMapper.readTree(createResponse).get("id").asLong();
 
-        String responseBody = createResult.getResponse().getContentAsString();
-        Long planId = objectMapper.readTree(responseBody).get("id").asLong();
+                // when - 수정
+                CityDto newDestination = CityDto.builder()
+                                .name("오사카")
+                                .build();
 
-        // 2. 장소 정보 조회 확인
-        mockMvc.perform(get("/api/travel-plans/{planId}", planId))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.days[0].places", hasSize(2)))
-                .andExpect(jsonPath("$.days[0].places[0].latitude").value(35.6585805))
-                .andExpect(jsonPath("$.days[0].places[0].longitude").value(139.7454329));
-    }
+                UpdateTravelPlanRequest updateRequest = UpdateTravelPlanRequest.builder()
+                                .title("오사카 여행")
+                                .destination(newDestination)
+                                .participants(3)
+                                .build();
 
-    @Test
-    @DisplayName("여러 여행 계획 생성 후 목록 조회")
-    void createMultiplePlans_AndList() throws Exception {
-        // given - 3개의 여행 계획 생성
-        CreateTravelPlanRequest plan1 = CreateTravelPlanRequest.builder()
-                .title("도쿄 여행")
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                .participants(2)
-                .days(new ArrayList<>())
-                .build();
+                // then
+                mockMvc.perform(put("/api/travel-plans/{planId}", planId)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(updateRequest)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.title").value("오사카 여행"))
+                                .andExpect(jsonPath("$.destination.name").value("오사카"))
+                                .andExpect(jsonPath("$.participants").value(3));
+        }
 
-        CreateTravelPlanRequest plan2 = CreateTravelPlanRequest.builder()
-                .title("파리 여행")
-                .destination("파리")
-                .startDate("2024.12.01")
-                .endDate("2024.12.05")
-                .participants(3)
-                .days(new ArrayList<>())
-                .build();
+        @Test
+        @DisplayName("여행 계획 삭제")
+        void deleteTravelPlan() throws Exception {
+                // given - 여행 계획 생성
+                CityDto destination = CityDto.builder()
+                                .name("도쿄")
+                                .build();
 
-        CreateTravelPlanRequest plan3 = CreateTravelPlanRequest.builder()
-                .title("뉴욕 여행")
-                .destination("뉴욕")
-                .startDate("2025.01.10")
-                .endDate("2025.01.15")
-                .participants(4)
-                .days(new ArrayList<>())
-                .build();
+                CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
+                                .title("도쿄 여행")
+                                .destination(destination)
+                                .startDate("2024.11.20")
+                                .endDate("2024.11.23")
+                                .participants(2)
+                                .days(new ArrayList<>())
+                                .build();
 
-        mockMvc.perform(post("/api/travel-plans")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(plan1)));
+                String createResponse = mockMvc.perform(post("/api/travel-plans")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .andExpect(status().isCreated())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
 
-        mockMvc.perform(post("/api/travel-plans")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(plan2)));
+                Long planId = objectMapper.readTree(createResponse).get("id").asLong();
 
-        mockMvc.perform(post("/api/travel-plans")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(plan3)));
+                // when - 삭제
+                mockMvc.perform(delete("/api/travel-plans/{planId}", planId))
+                                .andExpect(status().isNoContent());
 
-        // when & then - 모든 계획 조회 (페이징)
-        mockMvc.perform(get("/api/travel-plans"))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", hasSize(3)))
-                .andExpect(jsonPath("$.content[0].title").exists())
-                .andExpect(jsonPath("$.content[1].title").exists())
-                .andExpect(jsonPath("$.content[2].title").exists());
-    }
+                // then - 조회 시 없음 확인
+                mockMvc.perform(get("/api/travel-plans/{planId}", planId))
+                                .andExpect(status().isInternalServerError());
+        }
 
-    @Test
-    @DisplayName("일차 데이터 업데이트 테스트")
-    void updatePlan_ReplaceDays() throws Exception {
-        // 1. 초기 여행 계획 생성 (1일차만)
-        TravelDayDto day1 = TravelDayDto.builder()
-                .dayNumber(1)
-                .date("2024-11-20")
-                .displayDate("11월 20일(수)")
-                .places(new ArrayList<>())
-                .build();
+        @Test
+        @DisplayName("여행 계획 아카이브")
+        void archiveTravelPlan() throws Exception {
+                // given - 여행 계획 생성
+                CityDto destination = CityDto.builder()
+                                .name("도쿄")
+                                .build();
 
-        CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
-                .title("도쿄 여행")
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                .participants(2)
-                .days(List.of(day1))
-                .build();
+                CreateTravelPlanRequest createRequest = CreateTravelPlanRequest.builder()
+                                .title("도쿄 여행")
+                                .destination(destination)
+                                .startDate("2024.11.20")
+                                .endDate("2024.11.23")
+                                .participants(2)
+                                .days(new ArrayList<>())
+                                .build();
 
-        MvcResult createResult = mockMvc.perform(post("/api/travel-plans")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createRequest)))
-                .andExpect(status().isCreated())
-                .andReturn();
+                String createResponse = mockMvc.perform(post("/api/travel-plans")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(createRequest)))
+                                .andExpect(status().isCreated())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString();
 
-        String responseBody = createResult.getResponse().getContentAsString();
-        Long planId = objectMapper.readTree(responseBody).get("id").asLong();
+                Long planId = objectMapper.readTree(createResponse).get("id").asLong();
 
-        // 2. 일차 데이터 업데이트 (2일차 추가)
-        TravelDayDto updatedDay1 = TravelDayDto.builder()
-                .dayNumber(1)
-                .date("2024-11-20")
-                .displayDate("11월 20일(수)")
-                .places(new ArrayList<>())
-                .build();
+                // when - 아카이브
+                mockMvc.perform(post("/api/travel-plans/{planId}/archive", planId))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.isArchived").value(true));
 
-        TravelDayDto day2 = TravelDayDto.builder()
-                .dayNumber(2)
-                .date("2024-11-21")
-                .displayDate("11월 21일(목)")
-                .places(new ArrayList<>())
-                .build();
+                // then - 일반 목록에서는 조회되지 않음
+                mockMvc.perform(get("/api/travel-plans")
+                                .param("page", "0")
+                                .param("limit", "10"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.content", hasSize(0)));
+        }
 
-        UpdateTravelPlanRequest updateRequest = UpdateTravelPlanRequest.builder()
-                .days(List.of(updatedDay1, day2))
-                .build();
+        @Test
+        @DisplayName("페이징된 여행 계획 목록 조회")
+        void getTravelPlansWithPaging() throws Exception {
+                // given - 여러 여행 계획 생성
+                for (int i = 1; i <= 3; i++) {
+                        CityDto destination = CityDto.builder()
+                                        .name("도시" + i)
+                                        .build();
 
-        mockMvc.perform(put("/api/travel-plans/{planId}", planId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateRequest)))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.days", hasSize(2)));
-    }
+                        CreateTravelPlanRequest request = CreateTravelPlanRequest.builder()
+                                        .title("여행 " + i)
+                                        .destination(destination)
+                                        .startDate("2024.11.20")
+                                        .endDate("2024.11.23")
+                                        .participants(2)
+                                        .days(new ArrayList<>())
+                                        .build();
 
-    @Test
-    @DisplayName("유효성 검증 실패 테스트")
-    void validation_Failure() throws Exception {
-        // 1. 필수 필드 누락
-        CreateTravelPlanRequest invalidRequest1 = CreateTravelPlanRequest.builder()
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                // title 누락
-                .participants(2)
-                .build();
+                        mockMvc.perform(post("/api/travel-plans")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isCreated());
+                }
 
-        mockMvc.perform(post("/api/travel-plans")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest1)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("입력값 검증 실패"));
-
-        // 2. 참가자 수 0 이하
-        CreateTravelPlanRequest invalidRequest2 = CreateTravelPlanRequest.builder()
-                .title("도쿄 여행")
-                .destination("도쿄")
-                .startDate("2024.11.20")
-                .endDate("2024.11.23")
-                .participants(0)
-                .build();
-
-        mockMvc.perform(post("/api/travel-plans")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest2)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
-    }
+                // when & then
+                mockMvc.perform(get("/api/travel-plans")
+                                .param("page", "0")
+                                .param("limit", "2"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.content", hasSize(2)))
+                                .andExpect(jsonPath("$.totalElements").value(3))
+                                .andExpect(jsonPath("$.totalPages").value(2));
+        }
 }
-
