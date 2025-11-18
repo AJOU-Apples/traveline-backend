@@ -31,6 +31,7 @@ public class ExpenseService {
     private final TravelDayRepository travelDayRepository;
     private final PlaceRepository placeRepository;
     private final ExpenseMapper expenseMapper;
+    private final UserRepository userRepository;
 
     /**
      * 지출 추가
@@ -208,6 +209,13 @@ public class ExpenseService {
                         BigDecimal.valueOf(splitCount), 2, RoundingMode.HALF_UP));
             }
         }
+
+        if (request.getPaidById() != null) {
+            Long newPaidById = request.getPaidById();
+            User newUser = userRepository.findById(newPaidById)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", newPaidById));
+            expense.setPaidBy(newUser);
+        }
         if (request.getType() != null) {
             expense.setType(request.getType());
         }
@@ -235,7 +243,7 @@ public class ExpenseService {
         }
 
         Expense updatedExpense = expenseRepository.save(expense);
-        log.info("지출 수정 완료: expenseId={}, userId={}", expenseId, userId);
+        log.info("지출 수정 완료: expenseId={}, userId={}, newPaidById={}", expenseId, userId, updatedExpense.getPaidBy().getId());
 
         return expenseMapper.toDto(updatedExpense);
     }
