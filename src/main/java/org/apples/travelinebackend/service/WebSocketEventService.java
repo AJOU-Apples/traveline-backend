@@ -2,6 +2,7 @@ package org.apples.travelinebackend.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apples.travelinebackend.dto.ChatMessageDto;
 import org.apples.travelinebackend.dto.*;
 import org.apples.travelinebackend.websocket.TravelPlanWebSocketHandler;
 import org.springframework.stereotype.Service;
@@ -104,6 +105,13 @@ public class WebSocketEventService {
 
     public void broadcastMemberLeft(Long travelPlanId, Long memberId) {
         TravelPlanEvent.MemberLeftEvent event = new TravelPlanEvent.MemberLeftEvent(memberId);
+        webSocketHandler.broadcastToPlan(travelPlanId, event);
+    }
+
+    // ==================== Chat Events ====================
+
+    public void broadcastChatMessage(Long travelPlanId, ChatMessageDto chatMessageDto) {
+        TravelPlanEvent.ChatMessageSentEvent event = new TravelPlanEvent.ChatMessageSentEvent(chatMessageDto);
         webSocketHandler.broadcastToPlan(travelPlanId, event);
     }
 }

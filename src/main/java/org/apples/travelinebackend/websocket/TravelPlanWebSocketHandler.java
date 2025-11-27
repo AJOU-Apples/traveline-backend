@@ -3,9 +3,13 @@ package org.apples.travelinebackend.websocket;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apples.travelinebackend.dto.SendChatMessageRequest;
 import org.apples.travelinebackend.dto.TravelPlanEvent;
+import org.apples.travelinebackend.dto.WebSocketChatMessageRequest;
 import org.apples.travelinebackend.entity.User;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
+import org.apples.travelinebackend.repository.UserRepository;
+import org.apples.travelinebackend.service.ChatService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -26,6 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TravelPlanWebSocketHandler extends TextWebSocketHandler {
 
     private final TravelPlanRepository travelPlanRepository;
+    private final UserRepository userRepository;
+    private final ChatService chatService;
     private final ObjectMapper objectMapper;
     
     // planId -> Set<WebSocketSession> 매핑
@@ -81,8 +87,38 @@ public class TravelPlanWebSocketHandler extends TextWebSocketHandler {
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        // 클라이언트로부터 메시지를 받는 경우 (필요시 구현)
         log.debug("WebSocket 메시지 수신: sessionId={}, message={}", session.getId(), message.getPayload());
+        
+        try {
+            // JSON 파싱
+            WebSocketChatMessageRequest request = objectMapper.readValue(
+                    message.getPayload(), WebSocketChatMessageRequest.class);
+            
+            // 메시지 타입 확인
+            if ("CHAT_MESSAGE".equals(request.getType()) && request.getData() != null) {
+                Long planId = extractPlanId(session);
+                Long userId = extractUserId(session);
+                
+                if (planId == null || userId == null) {
+                    log.warn("WebSocket 채팅 메시지 처리 실패: planId 또는 userId가 null - sessionId={}", session.getId());
+                    return;
+                }
+                
+                // User 조회
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다: " + userId));
+                
+                // ChatService를 통해 메시지 저장 및 브로드캐스트
+                SendChatMessageRequest chatRequest = new SendChatMessageRequest(request.getData().getMessage());
+                chatService.sendMessage(planId, user, chatRequest);
+                
+                log.info("WebSocket 채팅 메시지 처리 완료: planId={}, userId={}", planId, userId);
+            } else {
+                log.debug("알 수 없는 메시지 타입 또는 데이터 없음: type={}", request.getType());
+            }
+        } catch (Exception e) {
+            log.error("WebSocket 메시지 처리 중 오류 발생: sessionId={}", session.getId(), e);
+        }
     }
 
     @Override
