@@ -43,7 +43,10 @@ import lombok.NoArgsConstructor;
 
         // Member 이벤트
         @JsonSubTypes.Type(value = TravelPlanEvent.MemberJoinedEvent.class, name = "MEMBER_JOINED"),
-        @JsonSubTypes.Type(value = TravelPlanEvent.MemberLeftEvent.class, name = "MEMBER_LEFT")
+        @JsonSubTypes.Type(value = TravelPlanEvent.MemberLeftEvent.class, name = "MEMBER_LEFT"),
+
+        // Chat 이벤트
+        @JsonSubTypes.Type(value = TravelPlanEvent.ChatMessageSentEvent.class, name = "CHAT_MESSAGE_SENT")
 })
 public abstract class TravelPlanEvent {
     private String type;
@@ -278,5 +281,19 @@ public abstract class TravelPlanEvent {
     @AllArgsConstructor
     public static class MemoDeletedData {
         private Long memoId;
+    }
+
+    // ==================== Chat Events ====================
+
+    @Data
+    @NoArgsConstructor
+    @EqualsAndHashCode(callSuper = false)
+    public static class ChatMessageSentEvent extends TravelPlanEvent {
+        private ChatMessageDto data;
+
+        public ChatMessageSentEvent(ChatMessageDto data) {
+            super("CHAT_MESSAGE_SENT");
+            this.data = data;
+        }
     }
 }
