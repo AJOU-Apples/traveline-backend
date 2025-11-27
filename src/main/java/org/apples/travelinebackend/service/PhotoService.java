@@ -33,6 +33,7 @@ public class PhotoService {
     private final FileStorageService fileStorageService;
     private final ImageMetadataService imageMetadataService;
     private final PhotoMapper photoMapper;
+    private final WebSocketEventService webSocketEventService;
 
     /**
      * 사진 업로드
@@ -119,7 +120,12 @@ public class PhotoService {
         log.info("사진 업로드 완료: photoId={}, userId={}, filename={}", 
                 savedPhoto.getId(), user.getId(), savedPhoto.getFilename());
 
-        return photoMapper.toDto(savedPhoto);
+        PhotoDto photoDto = photoMapper.toDto(savedPhoto);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastPhotoAdded(travelPlanId, photoDto);
+
+        return photoDto;
     }
 
     /**

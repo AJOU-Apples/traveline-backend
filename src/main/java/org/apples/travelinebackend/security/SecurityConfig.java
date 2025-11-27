@@ -30,23 +30,23 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.disable())
-                .sessionManagement(session -> 
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/cities/**",
-                                "/error"
-                        ).permitAll()
+                                "/error")
+                        .permitAll()
                         // Static resources (photos, thumbnails)
                         .requestMatchers(
                                 "/photos/**",
-                                "/thumbnails/**"
-                        ).permitAll()
+                                "/thumbnails/**")
+                        .permitAll()
+                        // WebSocket endpoints (인증은 WebSocket 인터셉터에서 처리)
+                        .requestMatchers("/ws/**").permitAll()
                         // All other endpoints require authentication
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -71,4 +71,3 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
-

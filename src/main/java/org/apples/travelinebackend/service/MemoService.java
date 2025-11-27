@@ -28,6 +28,7 @@ public class MemoService {
     private final MemoRepository memoRepository;
     private final PlaceRepository placeRepository;
     private final MemoMapper memoMapper;
+    private final WebSocketEventService webSocketEventService;
 
     @Transactional
     public MemoDto createMemo(CreateMemoRequest request, User user) {
@@ -54,7 +55,13 @@ public class MemoService {
         log.info("메모 생성 완료: memoId={}, placeId={}, userId={}", 
                 savedMemo.getId(), place.getId(), user.getId());
 
-        return memoMapper.toDto(savedMemo);
+        MemoDto memoDto = memoMapper.toDto(savedMemo);
+        
+        // WebSocket 이벤트 브로드캐스트
+        Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
+        webSocketEventService.broadcastMemoAdded(travelPlanId, memoDto);
+
+        return memoDto;
     }
 
     @Transactional(readOnly = true)
@@ -106,7 +113,14 @@ public class MemoService {
         Memo updatedMemo = memoRepository.save(memo);
 
         log.info("메모 수정 완료: memoId={}", memoId);
-        return memoMapper.toDto(updatedMemo);
+        
+        MemoDto memoDto = memoMapper.toDto(updatedMemo);
+        
+        // WebSocket 이벤트 브로드캐스트
+        Long travelPlanId = updatedMemo.getPlace().getTravelDay().getTravelPlan().getId();
+        webSocketEventService.broadcastMemoUpdated(travelPlanId, memoDto);
+
+        return memoDto;
     }
 
     @Transactional
@@ -121,10 +135,16 @@ public class MemoService {
             throw new ForbiddenException("메모 작성자만 삭제할 수 있습니다");
         }
 
+        Long travelPlanId = memo.getPlace().getTravelDay().getTravelPlan().getId();
+        Long deletedMemoId = memo.getId();
+
         memo.setDeletedAt(LocalDateTime.now());
         memoRepository.save(memo);
 
         log.info("메모 삭제 완료: memoId={}", memoId);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastMemoDeleted(travelPlanId, deletedMemoId);
     }
 }
 

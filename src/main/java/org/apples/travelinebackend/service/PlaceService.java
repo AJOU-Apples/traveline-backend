@@ -43,6 +43,7 @@ public class PlaceService {
     private final ExpenseRepository expenseRepository;
     private final PlaceMapper placeMapper;
     private final EntityManager entityManager;
+    private final WebSocketEventService webSocketEventService;
 
     /**
      * 장소 추가
@@ -86,7 +87,12 @@ public class PlaceService {
         Place savedPlace = placeRepository.save(place);
         log.info("장소 추가 완료: placeId={}, name={}, userId={}", savedPlace.getId(), savedPlace.getName(), userId);
         
-        return placeMapper.toDto(savedPlace);
+        PlaceDto placeDto = placeMapper.toDto(savedPlace);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastPlaceAdded(request.getTravelPlanId(), placeDto);
+        
+        return placeDto;
     }
 
     /**
@@ -170,7 +176,13 @@ public class PlaceService {
         Place updatedPlace = placeRepository.save(place);
         log.info("장소 수정 완료: placeId={}, userId={}", placeId, userId);
         
-        return placeMapper.toDto(updatedPlace);
+        PlaceDto placeDto = placeMapper.toDto(updatedPlace);
+        Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastPlaceUpdated(travelPlanId, placeDto);
+        
+        return placeDto;
     }
 
     /**
@@ -228,8 +240,13 @@ public class PlaceService {
         
         log.info("장소 삭제 완료: placeId={}, userId={}", placeId, userId);
         
+        Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
+        
         // 7. 남은 장소들의 orderIndex 재조정
         reorderPlacesAfterDeletion(travelDayId, deletedOrderIndex);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastPlaceDeleted(travelPlanId, placeId);
     }
 
     /**
@@ -281,9 +298,20 @@ public class PlaceService {
         
         // 변경된 장소 목록 반환
         List<Place> reorderedPlaces = placeRepository.findByTravelDayIdOrderByOrderIndex(travelDay.getId());
-        return reorderedPlaces.stream()
+        List<PlaceDto> placeDtos = reorderedPlaces.stream()
                 .map(placeMapper::toDto)
                 .collect(Collectors.toList());
+        
+        // WebSocket 이벤트 브로드캐스트
+        List<Long> placeIds = placeDtos.stream()
+                .map(PlaceDto::getId)
+                .collect(Collectors.toList());
+        webSocketEventService.broadcastPlaceReordered(
+                request.getTravelPlanId(), 
+                request.getDayNumber(), 
+                placeIds);
+        
+        return placeDtos;
     }
 
     /**
@@ -325,7 +353,13 @@ public class PlaceService {
         }
         
         Place updatedPlace = placeRepository.save(place);
-        return placeMapper.toDto(updatedPlace);
+        PlaceDto placeDto = placeMapper.toDto(updatedPlace);
+        Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
+        
+        // WebSocket 이벤트 브로드캐스트 (메모 업데이트도 PLACE_UPDATED로 처리)
+        webSocketEventService.broadcastPlaceUpdated(travelPlanId, placeDto);
+        
+        return placeDto;
     }
 
     // ==================== Private Helper Methods ====================

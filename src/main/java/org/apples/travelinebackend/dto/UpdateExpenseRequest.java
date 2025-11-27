@@ -15,7 +15,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateExpenseRequest {
-    
     private String title;
     private BigDecimal amount;
     private ExpenseType type;
@@ -24,5 +23,6 @@ public class UpdateExpenseRequest {
     private String memo;
     private LocalDate expenseDate;
     private String expenseTime;
+    private Long paidById;
 }
 
