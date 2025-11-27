@@ -29,6 +29,7 @@ public class AccommodationService {
     private final AccommodationRepository accommodationRepository;
     private final TravelPlanRepository travelPlanRepository;
     private final AccommodationMapper accommodationMapper;
+    private final WebSocketEventService webSocketEventService;
 
     @Transactional
     public AccommodationDto createAccommodation(CreateAccommodationRequest request, User user) {
@@ -160,7 +161,12 @@ public class AccommodationService {
         Accommodation updated = accommodationRepository.save(accommodation);
         log.info("숙소 정보 수정 완료: accommodationId={}", accommodationId);
 
-        return accommodationMapper.toDto(updated);
+        AccommodationDto accommodationDto = accommodationMapper.toDto(updated);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastAccommodationUpdated(updated.getTravelPlan().getId(), accommodationDto);
+
+        return accommodationDto;
     }
 
     @Transactional

@@ -29,6 +29,7 @@ public class FlightService {
     private final FlightRepository flightRepository;
     private final TravelPlanRepository travelPlanRepository;
     private final FlightMapper flightMapper;
+    private final WebSocketEventService webSocketEventService;
 
     @Transactional
     public FlightDto createFlight(CreateFlightRequest request, User user) {
@@ -160,7 +161,12 @@ public class FlightService {
         Flight updated = flightRepository.save(flight);
         log.info("항공권 정보 수정 완료: flightId={}", flightId);
 
-        return flightMapper.toDto(updated);
+        FlightDto flightDto = flightMapper.toDto(updated);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastFlightUpdated(updated.getTravelPlan().getId(), flightDto);
+
+        return flightDto;
     }
 
     @Transactional

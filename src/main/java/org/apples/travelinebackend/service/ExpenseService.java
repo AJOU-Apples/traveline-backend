@@ -32,6 +32,7 @@ public class ExpenseService {
     private final PlaceRepository placeRepository;
     private final ExpenseMapper expenseMapper;
     private final UserRepository userRepository;
+    private final WebSocketEventService webSocketEventService;
 
     /**
      * 지출 추가
@@ -102,7 +103,12 @@ public class ExpenseService {
         log.info("지출 추가 완료: expenseId={}, userId={}, amount={}", 
                 savedExpense.getId(), user.getId(), savedExpense.getAmount());
 
-        return expenseMapper.toDto(savedExpense);
+        ExpenseDto expenseDto = expenseMapper.toDto(savedExpense);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastExpenseAdded(request.getTravelPlanId(), expenseDto);
+
+        return expenseDto;
     }
 
     /**
@@ -245,7 +251,12 @@ public class ExpenseService {
         Expense updatedExpense = expenseRepository.save(expense);
         log.info("지출 수정 완료: expenseId={}, userId={}, newPaidById={}", expenseId, userId, updatedExpense.getPaidBy().getId());
 
-        return expenseMapper.toDto(updatedExpense);
+        ExpenseDto expenseDto = expenseMapper.toDto(updatedExpense);
+        
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastExpenseUpdated(updatedExpense.getTravelPlan().getId(), expenseDto);
+
+        return expenseDto;
     }
 
     /**
@@ -264,8 +275,14 @@ public class ExpenseService {
             throw new ForbiddenException("지출을 삭제할 권한이 없습니다.");
         }
 
+        Long travelPlanId = expense.getTravelPlan().getId();
+        Long deletedExpenseId = expense.getId();
+
         expenseRepository.delete(expense);
         log.info("지출 삭제 완료: expenseId={}, userId={}", expenseId, userId);
+
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastExpenseDeleted(travelPlanId, deletedExpenseId);
     }
 
     /**
