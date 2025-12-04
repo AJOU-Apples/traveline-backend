@@ -39,8 +39,8 @@ google:
 
 # Amadeus API
 amadeus:
-  api-key: ${AMADEUS_API_KEY:KwkCHgyWy7j4WTtMOyxiQI0NAjRqOevk}
-  api-secret: ${AMADEUS_API_SECRET:At87UUr179noUfTy}
+  api-key: ${AMADEUS_API_KEY}
+  api-secret: ${AMADEUS_API_SECRET}
   api-url: ${AMADEUS_API_URL:https://test.api.amadeus.com}
 
 # File Storage
@@ -53,5 +53,10 @@ logging:
   level:
     org.apples.travelinebackend: DEBUG
     org.springframework.security: DEBUG
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: OFF
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# Invite Code
+app:
+  invite-link:
+    expiration-days: ${INVITE_LINK_EXPIRATION_DAYS:7}
