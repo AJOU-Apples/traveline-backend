@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/cities/**",
+                                "/api/travel-plans/invite/**",  // 초대 링크 조회는 비인증 허용
                                 "/error")
                         .permitAll()
                         // Static resources (photos, thumbnails)
