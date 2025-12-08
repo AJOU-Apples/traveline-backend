@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -24,10 +26,14 @@ public class Memo {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Place place;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private User author;
 
     @Column(nullable = false, columnDefinition = "TEXT")

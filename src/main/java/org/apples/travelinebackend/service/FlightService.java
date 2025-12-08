@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apples.travelinebackend.dto.CreateFlightRequest;
 import org.apples.travelinebackend.dto.FlightDto;
+import org.apples.travelinebackend.dto.LikeResponse;
 import org.apples.travelinebackend.dto.UpdateFlightRequest;
 import org.apples.travelinebackend.entity.Flight;
 import org.apples.travelinebackend.entity.TravelPlan;
@@ -12,8 +13,10 @@ import org.apples.travelinebackend.exception.BadRequestException;
 import org.apples.travelinebackend.exception.ForbiddenException;
 import org.apples.travelinebackend.exception.ResourceNotFoundException;
 import org.apples.travelinebackend.mapper.FlightMapper;
+import org.apples.travelinebackend.repository.FlightLikeRepository;
 import org.apples.travelinebackend.repository.FlightRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
+import org.apples.travelinebackend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,7 +30,9 @@ import java.util.stream.Collectors;
 public class FlightService {
 
     private final FlightRepository flightRepository;
+    private final FlightLikeRepository flightLikeRepository;
     private final TravelPlanRepository travelPlanRepository;
+    private final UserRepository userRepository;
     private final FlightMapper flightMapper;
     private final WebSocketEventService webSocketEventService;
 
@@ -85,7 +90,7 @@ public class FlightService {
         Flight saved = flightRepository.save(flight);
         log.info("항공권 정보 생성 완료: flightId={}", saved.getId());
 
-        return flightMapper.toDto(saved);
+        return flightMapper.toDto(saved, user.getId());
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +107,7 @@ public class FlightService {
 
         List<Flight> flights = flightRepository.findByTravelPlanIdAndDeletedAtIsNull(travelPlanId);
         return flights.stream()
-                .map(flightMapper::toDto)
+                .map(flight -> flightMapper.toDto(flight, user.getId()))
                 .collect(Collectors.toList());
     }
 
@@ -117,7 +122,7 @@ public class FlightService {
             throw new ForbiddenException("항공권 정보에 접근할 권한이 없습니다");
         }
 
-        return flightMapper.toDto(flight);
+        return flightMapper.toDto(flight, user.getId());
     }
 
     @Transactional
@@ -161,7 +166,7 @@ public class FlightService {
         Flight updated = flightRepository.save(flight);
         log.info("항공권 정보 수정 완료: flightId={}", flightId);
 
-        FlightDto flightDto = flightMapper.toDto(updated);
+        FlightDto flightDto = flightMapper.toDto(updated, user.getId());
         
         // WebSocket 이벤트 브로드캐스트
         webSocketEventService.broadcastFlightUpdated(updated.getTravelPlan().getId(), flightDto);
@@ -184,6 +189,67 @@ public class FlightService {
         flightRepository.save(flight);
 
         log.info("항공권 정보 삭제 완료: flightId={}", flightId);
+    }
+
+    /**
+     * Flight 좋아요 토글
+     */
+    @Transactional
+    public LikeResponse toggleFlightLike(Long planId, Long flightId, Long userId) {
+        // TravelPlan 권한 검증
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
+
+        if (!travelPlan.hasAccess(userId)) {
+            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
+        }
+
+        // Flight 존재 확인 및 TravelPlan 소속 확인
+        Flight flight = flightRepository.findByIdAndDeletedAtIsNull(flightId)
+                .orElseThrow(() -> new ResourceNotFoundException("항공권", "id", flightId));
+
+        if (!flight.getTravelPlan().getId().equals(planId)) {
+            throw new BadRequestException("항공권이 해당 여행 계획에 속하지 않습니다.");
+        }
+
+        // 좋아요 토글
+        org.apples.travelinebackend.entity.FlightLike existingLike = flightLikeRepository
+                .findByFlightIdAndUserId(flightId, userId)
+                .orElse(null);
+
+        boolean isLiked;
+        if (existingLike != null) {
+            // 좋아요 취소
+            flightLikeRepository.delete(existingLike);
+            isLiked = false;
+        } else {
+            // 좋아요 추가
+            org.apples.travelinebackend.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("사용자", "id", userId));
+            
+            org.apples.travelinebackend.entity.FlightLike like = org.apples.travelinebackend.entity.FlightLike.builder()
+                    .flight(flight)
+                    .user(user)
+                    .build();
+            flightLikeRepository.save(like);
+            isLiked = true;
+        }
+
+        // 좋아요한 멤버 ID 목록 조회
+        List<Long> likedBy = flightLikeRepository.findUserIdsByFlightId(flightId);
+        long likeCount = likedBy.size();
+
+        log.info("Flight 좋아요 토글: flightId={}, userId={}, isLiked={}, likeCount={}", 
+                flightId, userId, isLiked, likeCount);
+
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastFlightLikeChanged(planId, flightId, userId, isLiked, likeCount);
+
+        return LikeResponse.builder()
+                .isLiked(isLiked)
+                .likeCount((int) likeCount)
+                .likedBy(likedBy)
+                .build();
     }
 }
 

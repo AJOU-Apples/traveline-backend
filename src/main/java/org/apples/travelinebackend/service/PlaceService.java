@@ -17,9 +17,11 @@ import org.apples.travelinebackend.mapper.PlaceMapper;
 import org.apples.travelinebackend.repository.ExpenseRepository;
 import org.apples.travelinebackend.repository.MemoRepository;
 import org.apples.travelinebackend.repository.PhotoRepository;
+import org.apples.travelinebackend.repository.PlaceLikeRepository;
 import org.apples.travelinebackend.repository.PlaceRepository;
 import org.apples.travelinebackend.repository.TravelDayRepository;
 import org.apples.travelinebackend.repository.TravelPlanRepository;
+import org.apples.travelinebackend.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,8 @@ public class PlaceService {
     private final PhotoRepository photoRepository;
     private final MemoRepository memoRepository;
     private final ExpenseRepository expenseRepository;
+    private final PlaceLikeRepository placeLikeRepository;
+    private final UserRepository userRepository;
     private final PlaceMapper placeMapper;
     private final EntityManager entityManager;
     private final WebSocketEventService webSocketEventService;
@@ -87,7 +91,7 @@ public class PlaceService {
         Place savedPlace = placeRepository.save(place);
         log.info("장소 추가 완료: placeId={}, name={}, userId={}", savedPlace.getId(), savedPlace.getName(), userId);
         
-        PlaceDto placeDto = placeMapper.toDto(savedPlace);
+        PlaceDto placeDto = placeMapper.toDto(savedPlace, userId);
         
         // WebSocket 이벤트 브로드캐스트
         webSocketEventService.broadcastPlaceAdded(request.getTravelPlanId(), placeDto);
@@ -110,7 +114,7 @@ public class PlaceService {
         List<Place> places = placeRepository.findByTravelPlanIdAndDayNumber(travelPlanId, dayNumber);
         
         return places.stream()
-                .map(placeMapper::toDto)
+                .map(place -> placeMapper.toDto(place, userId))
                 .collect(Collectors.toList());
     }
 
@@ -126,7 +130,7 @@ public class PlaceService {
             throw new ForbiddenException("해당 장소에 대한 권한이 없습니다.");
         }
         
-        return placeMapper.toDto(place);
+        return placeMapper.toDto(place, userId);
     }
 
     /**
@@ -176,7 +180,7 @@ public class PlaceService {
         Place updatedPlace = placeRepository.save(place);
         log.info("장소 수정 완료: placeId={}, userId={}", placeId, userId);
         
-        PlaceDto placeDto = placeMapper.toDto(updatedPlace);
+        PlaceDto placeDto = placeMapper.toDto(updatedPlace, userId);
         Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
         
         // WebSocket 이벤트 브로드캐스트
@@ -299,7 +303,7 @@ public class PlaceService {
         // 변경된 장소 목록 반환
         List<Place> reorderedPlaces = placeRepository.findByTravelDayIdOrderByOrderIndex(travelDay.getId());
         List<PlaceDto> placeDtos = reorderedPlaces.stream()
-                .map(placeMapper::toDto)
+                .map(place -> placeMapper.toDto(place, userId))
                 .collect(Collectors.toList());
         
         // WebSocket 이벤트 브로드캐스트
@@ -353,7 +357,7 @@ public class PlaceService {
         }
         
         Place updatedPlace = placeRepository.save(place);
-        PlaceDto placeDto = placeMapper.toDto(updatedPlace);
+        PlaceDto placeDto = placeMapper.toDto(updatedPlace, userId);
         Long travelPlanId = place.getTravelDay().getTravelPlan().getId();
         
         // WebSocket 이벤트 브로드캐스트 (메모 업데이트도 PLACE_UPDATED로 처리)
@@ -378,6 +382,67 @@ public class PlaceService {
         
         placeRepository.saveAll(remainingPlaces);
         log.debug("orderIndex 재조정 완료: travelDayId={}", travelDayId);
+    }
+
+    /**
+     * Place 좋아요 토글
+     */
+    @Transactional
+    public LikeResponse togglePlaceLike(Long planId, Long placeId, Long userId) {
+        // TravelPlan 권한 검증
+        TravelPlan travelPlan = travelPlanRepository.findByIdWithMembers(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("여행 계획", "id", planId));
+
+        if (!travelPlan.hasAccess(userId)) {
+            throw new ForbiddenException("해당 여행 계획에 대한 권한이 없습니다.");
+        }
+
+        // Place 존재 확인 및 TravelPlan 소속 확인
+        Place place = placeRepository.findByIdWithTravelPlan(placeId)
+                .orElseThrow(() -> new ResourceNotFoundException("장소", "id", placeId));
+
+        if (!place.getTravelDay().getTravelPlan().getId().equals(planId)) {
+            throw new BadRequestException("장소가 해당 여행 계획에 속하지 않습니다.");
+        }
+
+        // 좋아요 토글
+        org.apples.travelinebackend.entity.PlaceLike existingLike = placeLikeRepository
+                .findByPlaceIdAndUserId(placeId, userId)
+                .orElse(null);
+
+        boolean isLiked;
+        if (existingLike != null) {
+            // 좋아요 취소
+            placeLikeRepository.delete(existingLike);
+            isLiked = false;
+        } else {
+            // 좋아요 추가
+            org.apples.travelinebackend.entity.User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("사용자", "id", userId));
+            
+            org.apples.travelinebackend.entity.PlaceLike like = org.apples.travelinebackend.entity.PlaceLike.builder()
+                    .place(place)
+                    .user(user)
+                    .build();
+            placeLikeRepository.save(like);
+            isLiked = true;
+        }
+
+        // 좋아요한 멤버 ID 목록 조회
+        List<Long> likedBy = placeLikeRepository.findUserIdsByPlaceId(placeId);
+        long likeCount = likedBy.size();
+
+        log.info("Place 좋아요 토글: placeId={}, userId={}, isLiked={}, likeCount={}", 
+                placeId, userId, isLiked, likeCount);
+
+        // WebSocket 이벤트 브로드캐스트
+        webSocketEventService.broadcastPlaceLikeChanged(planId, placeId, userId, isLiked, likeCount);
+
+        return LikeResponse.builder()
+                .isLiked(isLiked)
+                .likeCount((int) likeCount)
+                .likedBy(likedBy)
+                .build();
     }
 }
 

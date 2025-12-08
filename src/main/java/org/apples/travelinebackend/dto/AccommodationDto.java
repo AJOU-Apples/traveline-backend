@@ -1,5 +1,6 @@
 package org.apples.travelinebackend.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,5 +39,11 @@ public class AccommodationDto {
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // 좋아요 정보
+    @JsonProperty("likes")
+    @Builder.Default
+    private Integer likeCount = 0;
+    private Boolean isLiked;
 }
 

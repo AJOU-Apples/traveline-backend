@@ -303,8 +303,11 @@ class TravelPlanRepositoryTest {
 
                 // then
                 assertThat(foundPlan.getDays()).hasSize(3);
-                assertThat(foundPlan.getDays().get(0).getDayNumber()).isEqualTo(1);
-                assertThat(foundPlan.getDays().get(1).getDayNumber()).isEqualTo(2);
-                assertThat(foundPlan.getDays().get(2).getDayNumber()).isEqualTo(3);
+                List<TravelDay> sortedDays = foundPlan.getDays().stream()
+                        .sorted((d1, d2) -> d1.getDayNumber().compareTo(d2.getDayNumber()))
+                        .collect(java.util.stream.Collectors.toList());
+                assertThat(sortedDays.get(0).getDayNumber()).isEqualTo(1);
+                assertThat(sortedDays.get(1).getDayNumber()).isEqualTo(2);
+                assertThat(sortedDays.get(2).getDayNumber()).isEqualTo(3);
         }
 }

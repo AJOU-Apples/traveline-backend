@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
@@ -50,6 +52,12 @@ public class User implements UserDetails {
     @Column(length = 500)
     private String bio;
 
+    // 역할
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private UserRole role = UserRole.USER;
+
     // 계정 상태
     @Column(nullable = false)
     @Builder.Default
@@ -74,12 +82,21 @@ public class User implements UserDetails {
     // Relations
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<TravelPlan> travelPlans = new ArrayList<>();
 
     // UserDetails 구현
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+    
+    /**
+     * 관리자 권한 확인
+     */
+    public boolean isAdmin() {
+        return role == UserRole.ADMIN;
     }
 
     @Override

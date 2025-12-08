@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -26,6 +28,8 @@ public class Supply {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_plan_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private TravelPlan travelPlan;
 
     @Column(nullable = false, length = 200)
