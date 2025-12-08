@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -36,18 +38,26 @@ public class Expense {
     // Relations
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_plan_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private TravelPlan travelPlan;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_day_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private TravelDay travelDay;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "place_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Place place;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "paid_by", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private User paidBy;  // 결제한 사람
 
     // 지출 정보

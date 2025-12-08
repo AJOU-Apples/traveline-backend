@@ -40,6 +40,11 @@ public class WebSocketEventService {
         webSocketHandler.broadcastToPlan(travelPlanId, event);
     }
 
+    public void broadcastPlaceLikeChanged(Long travelPlanId, Long placeId, Long userId, boolean isLiked, long likeCount) {
+        TravelPlanEvent.PlaceLikeChangedEvent event = new TravelPlanEvent.PlaceLikeChangedEvent(placeId, userId, isLiked, likeCount);
+        webSocketHandler.broadcastToPlan(travelPlanId, event);
+    }
+
     // ==================== Expense Events ====================
 
     public void broadcastExpenseAdded(Long travelPlanId, ExpenseDto expenseDto) {
@@ -71,11 +76,21 @@ public class WebSocketEventService {
         webSocketHandler.broadcastToPlan(travelPlanId, event);
     }
 
+    public void broadcastFlightLikeChanged(Long travelPlanId, Long flightId, Long userId, boolean isLiked, long likeCount) {
+        TravelPlanEvent.FlightLikeChangedEvent event = new TravelPlanEvent.FlightLikeChangedEvent(flightId, userId, isLiked, likeCount);
+        webSocketHandler.broadcastToPlan(travelPlanId, event);
+    }
+
     // ==================== Accommodation Events ====================
 
     public void broadcastAccommodationUpdated(Long travelPlanId, AccommodationDto accommodationDto) {
         TravelPlanEvent.AccommodationUpdatedEvent event = new TravelPlanEvent.AccommodationUpdatedEvent(
                 accommodationDto);
+        webSocketHandler.broadcastToPlan(travelPlanId, event);
+    }
+
+    public void broadcastAccommodationLikeChanged(Long travelPlanId, Long accommodationId, Long userId, boolean isLiked, long likeCount) {
+        TravelPlanEvent.AccommodationLikeChangedEvent event = new TravelPlanEvent.AccommodationLikeChangedEvent(accommodationId, userId, isLiked, likeCount);
         webSocketHandler.broadcastToPlan(travelPlanId, event);
     }
 

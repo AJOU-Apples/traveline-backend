@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -32,6 +34,8 @@ public class Place {
     // Relations
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "travel_day_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private TravelDay travelDay;
 
     // 장소 정보

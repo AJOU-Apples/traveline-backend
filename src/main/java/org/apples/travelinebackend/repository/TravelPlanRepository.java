@@ -93,5 +93,12 @@ public interface TravelPlanRepository extends JpaRepository<TravelPlan, Long> {
            "WHERE tp.id = :id " +
            "AND (tp.user.id = :userId OR (m.user.id = :userId AND m.status = 'ACCEPTED'))")
     Optional<TravelPlan> findByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    /**
+     * 특정 기간 동안 생성된 여행 계획 수
+     */
+    @Query("SELECT COUNT(tp) FROM TravelPlan tp WHERE tp.createdAt >= :startDate AND tp.createdAt < :endDate")
+    long countByCreatedAtBetween(@Param("startDate") java.time.LocalDateTime startDate,
+                                 @Param("endDate") java.time.LocalDateTime endDate);
 }
 

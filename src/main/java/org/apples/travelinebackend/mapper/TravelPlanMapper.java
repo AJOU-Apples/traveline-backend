@@ -2,7 +2,6 @@ package org.apples.travelinebackend.mapper;
 
 import lombok.RequiredArgsConstructor;
 import org.apples.travelinebackend.dto.CityDto;
-import org.apples.travelinebackend.dto.MemberDto;
 import org.apples.travelinebackend.dto.TravelDayDto;
 import org.apples.travelinebackend.dto.TravelPlanDto;
 import org.apples.travelinebackend.entity.*;
@@ -33,6 +32,7 @@ public class TravelPlanMapper {
                 .participants(entity.getAcceptedMembersCount())  // 실제 수락된 멤버 수
                 .isArchived(entity.getIsArchived())
                 .days(entity.getDays().stream()
+                        .sorted((d1, d2) -> d1.getDayNumber().compareTo(d2.getDayNumber()))
                         .map(this::toDayDto)
                         .collect(Collectors.toList()))
                 .members(entity.getMembers().stream()

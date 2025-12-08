@@ -148,6 +148,7 @@ public class AuthService {
                                 .name(user.getName())
                                 .username(user.getNickname()) // 닉네임 필드
                                 .profileImageUrl(user.getProfileImage())
+                                .role(user.getRole())
                                 .build();
         }
 

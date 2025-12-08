@@ -21,6 +21,7 @@ import lombok.NoArgsConstructor;
         @JsonSubTypes.Type(value = TravelPlanEvent.PlaceUpdatedEvent.class, name = "PLACE_UPDATED"),
         @JsonSubTypes.Type(value = TravelPlanEvent.PlaceDeletedEvent.class, name = "PLACE_DELETED"),
         @JsonSubTypes.Type(value = TravelPlanEvent.PlaceReorderedEvent.class, name = "PLACE_REORDERED"),
+        @JsonSubTypes.Type(value = TravelPlanEvent.PlaceLikeChangedEvent.class, name = "PLACE_LIKE_CHANGED"),
 
         // Expense 이벤트
         @JsonSubTypes.Type(value = TravelPlanEvent.ExpenseAddedEvent.class, name = "EXPENSE_ADDED"),
@@ -32,9 +33,11 @@ import lombok.NoArgsConstructor;
 
         // Flight 이벤트
         @JsonSubTypes.Type(value = TravelPlanEvent.FlightUpdatedEvent.class, name = "FLIGHT_UPDATED"),
+        @JsonSubTypes.Type(value = TravelPlanEvent.FlightLikeChangedEvent.class, name = "FLIGHT_LIKE_CHANGED"),
 
         // Accommodation 이벤트
         @JsonSubTypes.Type(value = TravelPlanEvent.AccommodationUpdatedEvent.class, name = "ACCOMMODATION_UPDATED"),
+        @JsonSubTypes.Type(value = TravelPlanEvent.AccommodationLikeChangedEvent.class, name = "ACCOMMODATION_LIKE_CHANGED"),
 
         // Memo 이벤트
         @JsonSubTypes.Type(value = TravelPlanEvent.MemoAddedEvent.class, name = "MEMO_ADDED"),
@@ -98,6 +101,18 @@ public abstract class TravelPlanEvent {
         public PlaceReorderedEvent(Integer dayNumber, java.util.List<Long> placeIds) {
             super("PLACE_REORDERED");
             this.data = new PlaceReorderedData(dayNumber, placeIds);
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @EqualsAndHashCode(callSuper = false)
+    public static class PlaceLikeChangedEvent extends TravelPlanEvent {
+        private PlaceLikeChangedData data;
+
+        public PlaceLikeChangedEvent(Long placeId, Long userId, boolean isLiked, long likeCount) {
+            super("PLACE_LIKE_CHANGED");
+            this.data = new PlaceLikeChangedData(placeId, userId, isLiked, likeCount);
         }
     }
 
@@ -167,6 +182,18 @@ public abstract class TravelPlanEvent {
         }
     }
 
+    @Data
+    @NoArgsConstructor
+    @EqualsAndHashCode(callSuper = false)
+    public static class FlightLikeChangedEvent extends TravelPlanEvent {
+        private FlightLikeChangedData data;
+
+        public FlightLikeChangedEvent(Long flightId, Long userId, boolean isLiked, long likeCount) {
+            super("FLIGHT_LIKE_CHANGED");
+            this.data = new FlightLikeChangedData(flightId, userId, isLiked, likeCount);
+        }
+    }
+
     // ==================== Accommodation Events ====================
 
     @Data
@@ -178,6 +205,18 @@ public abstract class TravelPlanEvent {
         public AccommodationUpdatedEvent(AccommodationDto data) {
             super("ACCOMMODATION_UPDATED");
             this.data = data;
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @EqualsAndHashCode(callSuper = false)
+    public static class AccommodationLikeChangedEvent extends TravelPlanEvent {
+        private AccommodationLikeChangedData data;
+
+        public AccommodationLikeChangedEvent(Long accommodationId, Long userId, boolean isLiked, long likeCount) {
+            super("ACCOMMODATION_LIKE_CHANGED");
+            this.data = new AccommodationLikeChangedData(accommodationId, userId, isLiked, likeCount);
         }
     }
 
@@ -281,6 +320,36 @@ public abstract class TravelPlanEvent {
     @AllArgsConstructor
     public static class MemoDeletedData {
         private Long memoId;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PlaceLikeChangedData {
+        private Long placeId;
+        private Long userId;
+        private boolean isLiked;
+        private long likeCount;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class FlightLikeChangedData {
+        private Long flightId;
+        private Long userId;
+        private boolean isLiked;
+        private long likeCount;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AccommodationLikeChangedData {
+        private Long accommodationId;
+        private Long userId;
+        private boolean isLiked;
+        private long likeCount;
     }
 
     // ==================== Chat Events ====================
