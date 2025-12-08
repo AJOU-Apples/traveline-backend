@@ -1,0 +1,64 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.6'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'org.apples'
+version = '0.0.1-SNAPSHOT'
+description = 'traveline-backend'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // 🔥 P0 핵심 의존성
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    
+    // 🔐 보안 (JWT)
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
+    
+    // 🌐 외부 API 호출 (WebClient)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    
+    // 📸 이미지 처리
+    implementation 'net.coobird:thumbnailator:0.4.19'
+    implementation 'com.drewnoakes:metadata-extractor:2.19.0'
+    
+    // 🛠️ 개발 도구
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    
+    // 🗃️ Database
+    runtimeOnly 'org.postgresql:postgresql'
+    
+    // 🧪 테스트
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'com.h2database:h2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
